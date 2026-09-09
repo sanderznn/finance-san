@@ -2083,6 +2083,264 @@ nav.tabs .tab b{font-size:1rem}
   border-radius:12px;
   font-size:.66rem;
 }
+
+/* ==================================
+   NOVA NAVEGAÇÃO INFERIOR — SAN
+   ================================== */
+
+.tabs{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:1000;
+
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+
+  padding:
+    8px 14px
+    calc(8px + env(safe-area-inset-bottom));
+
+  background:rgba(5,5,5,.90);
+  border-top:1px solid rgba(255,255,255,.10);
+
+  -webkit-backdrop-filter:blur(22px);
+  backdrop-filter:blur(22px);
+}
+
+.tabs .tab{
+  min-width:0;
+  height:58px;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+
+  border:1px solid transparent;
+  border-radius:17px;
+
+  background:transparent;
+  color:#777780;
+
+  transition:
+    background .2s ease,
+    color .2s ease,
+    transform .15s ease;
+}
+
+.tabs .tab:active{
+  transform:scale(.95);
+}
+
+.tabs .tab.active{
+  color:#fff;
+  background:rgba(255,255,255,.10);
+  border-color:rgba(255,255,255,.08);
+}
+
+.tabIcon{
+  width:25px;
+  height:25px;
+  display:grid;
+  place-items:center;
+}
+
+.tabIcon svg{
+  width:25px;
+  height:25px;
+  display:block;
+}
+
+.tabLabel{
+  font-size:.64rem;
+  font-weight:800;
+  line-height:1;
+}
+
+
+/* ================================
+   MENU INFERIOR
+   ================================ */
+
+.navMenuOverlay{
+  position:fixed;
+  inset:0;
+  z-index:1500;
+
+  display:flex;
+  align-items:flex-end;
+
+  background:rgba(0,0,0,.58);
+
+  -webkit-backdrop-filter:blur(7px);
+  backdrop-filter:blur(7px);
+
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+
+  transition:
+    opacity .22s ease,
+    visibility .22s ease;
+}
+
+.navMenuOverlay.open{
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
+}
+
+.navMenuSheet{
+  width:100%;
+  max-width:520px;
+  margin:0 auto;
+
+  padding:
+    10px 16px
+    calc(22px + env(safe-area-inset-bottom));
+
+  border-radius:28px 28px 0 0;
+  border:1px solid rgba(255,255,255,.12);
+  border-bottom:none;
+
+  background:
+    linear-gradient(
+      180deg,
+      #171717 0%,
+      #090909 100%
+    );
+
+  box-shadow:
+    0 -20px 60px rgba(0,0,0,.55);
+
+  transform:translateY(35px);
+  transition:transform .25s ease;
+}
+
+.navMenuOverlay.open .navMenuSheet{
+  transform:translateY(0);
+}
+
+
+/* barrinha superior */
+
+.navMenuHandle{
+  width:38px;
+  height:4px;
+
+  margin:0 auto 17px;
+
+  border-radius:99px;
+  background:rgba(255,255,255,.20);
+}
+
+
+/* cabeçalho */
+
+.navMenuHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+
+  margin-bottom:16px;
+}
+
+.navMenuHeader span{
+  display:block;
+
+  font-family:'Space Mono',monospace;
+  font-size:.55rem;
+  letter-spacing:2px;
+
+  color:var(--muted);
+}
+
+.navMenuHeader h3{
+  margin-top:3px;
+  font-size:1.35rem;
+  color:#fff;
+}
+
+.navMenuClose{
+  width:42px;
+  height:42px;
+
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.12);
+
+  background:rgba(255,255,255,.06);
+  color:#fff;
+
+  font-size:1.4rem;
+}
+
+
+/* opções */
+
+.navMenuGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+
+.navMenuGrid > button{
+  min-height:78px;
+
+  display:flex;
+  align-items:center;
+  gap:12px;
+
+  padding:13px;
+
+  text-align:left;
+
+  border-radius:17px;
+  border:1px solid rgba(255,255,255,.10);
+
+  background:rgba(255,255,255,.045);
+  color:#fff;
+}
+
+.navMenuGrid > button:active{
+  transform:scale(.97);
+  background:rgba(255,255,255,.09);
+}
+
+.navMenuIcon{
+  width:38px;
+  height:38px;
+  flex:0 0 38px;
+
+  display:grid;
+  place-items:center;
+
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.10);
+
+  background:rgba(255,255,255,.06);
+
+  font-size:1.15rem;
+}
+
+.navMenuGrid b{
+  display:block;
+  font-size:.82rem;
+}
+
+.navMenuGrid small{
+  display:block;
+  margin-top:3px;
+
+  font-size:.6rem;
+  font-weight:500;
+
+  color:var(--muted);
+}
+
 </style>
 
 </head>
@@ -2574,14 +2832,198 @@ nav.tabs .tab b{font-size:1rem}
   </div>
 </div>
 <nav class="tabs">
-  <button class="tab active" onclick="show('home',this)"><b>⌂</b>Início</button>
-  <button class="tab" onclick="show('dividas',this)"><b>▦</b>Dívidas</button>
-  <button class="tab" onclick="show('cartao',this)"><b>💳</b>Cartão</button>
-  <button class="tab" onclick="show('video',this)"><b>🎬</b>Jobs</button>
-  <button class="tab" onclick="show('dash',this)"><b>▥</b>Dash</button>
-  <button class="tab" onclick="show('desejos',this)"><b>✦</b>Metas</button>
-  <button class="tab" onclick="show('config',this)"><b>⚙</b>Config</button>
+
+  <!-- INÍCIO -->
+  <button
+    id="navHome"
+    class="tab active"
+    onclick="show('home',this)">
+
+    <span class="tabIcon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M3 10.5L12 3l9 7.5"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"/>
+        <path d="M5.5 9.5V21h13V9.5"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linejoin="round"/>
+        <path d="M9.5 21v-6h5v6"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linejoin="round"/>
+      </svg>
+    </span>
+
+    <span class="tabLabel">Início</span>
+  </button>
+
+
+  <!-- CARTÃO -->
+  <button
+    id="navCard"
+    class="tab"
+    onclick="show('cartao',this)">
+
+    <span class="tabIcon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="2.5"
+              y="5"
+              width="19"
+              height="14"
+              rx="3"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <path d="M3 9h18"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <path d="M6.5 15h4"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"/>
+      </svg>
+    </span>
+
+    <span class="tabLabel">Cartão</span>
+  </button>
+
+
+  <!-- JOBS -->
+  <button
+    id="navJobs"
+    class="tab"
+    onclick="show('video',this)">
+
+    <span class="tabIcon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="3"
+              y="7"
+              width="18"
+              height="13"
+              rx="2.5"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <path d="M3.5 11h17"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <path d="M6 7l3-4M11 7l3-4M16 7l3-4"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"/>
+      </svg>
+    </span>
+
+    <span class="tabLabel">Jobs</span>
+  </button>
+
+
+  <!-- MENU -->
+  <button
+    id="navMenuBtn"
+    class="tab"
+    onclick="openNavMenu()">
+
+    <span class="tabIcon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <rect x="4"
+              y="4"
+              width="6"
+              height="6"
+              rx="1.5"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <rect x="14"
+              y="4"
+              width="6"
+              height="6"
+              rx="1.5"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <rect x="4"
+              y="14"
+              width="6"
+              height="6"
+              rx="1.5"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+        <rect x="14"
+              y="14"
+              width="6"
+              height="6"
+              rx="1.5"
+              stroke="currentColor"
+              stroke-width="1.8"/>
+      </svg>
+    </span>
+
+    <span class="tabLabel">Menu</span>
+  </button>
+
 </nav>
+
+<div
+  class="navMenuOverlay"
+  id="navMenuOverlay"
+  onclick="if(event.target===this)closeNavMenu()">
+
+  <div class="navMenuSheet">
+
+    <div class="navMenuHandle"></div>
+
+    <div class="navMenuHeader">
+      <div>
+        <span>ATALHOS</span>
+        <h3>Menu</h3>
+      </div>
+
+      <button
+        class="navMenuClose"
+        onclick="closeNavMenu()">
+        ×
+      </button>
+    </div>
+
+
+    <div class="navMenuGrid">
+
+      <button onclick="goFromMenu('dividas')">
+        <span class="navMenuIcon">▦</span>
+        <span>
+          <b>Dívidas</b>
+          <small>Contas e parcelas</small>
+        </span>
+      </button>
+
+      <button onclick="goFromMenu('dash')">
+        <span class="navMenuIcon">▥</span>
+        <span>
+          <b>Dashboard</b>
+          <small>Resumo financeiro</small>
+        </span>
+      </button>
+
+      <button onclick="goFromMenu('desejos')">
+        <span class="navMenuIcon">◇</span>
+        <span>
+          <b>Metas</b>
+          <small>Objetivos e desejos</small>
+        </span>
+      </button>
+
+      <button onclick="goFromMenu('config')">
+        <span class="navMenuIcon">⚙︎</span>
+        <span>
+          <b>Configurações</b>
+          <small>Backup e ajustes</small>
+        </span>
+      </button>
+
+    </div>
+
+  </div>
+</div>
 
 <script>
 const KEY='sanFinancePro_v6_fixas';
@@ -2652,7 +3094,62 @@ function syncMonthPicker(){const i=document.getElementById('smartMonthInput');if
 function movMonth(m){if(m.ym)return m.ym; const d=String(m.date||''); const parts=d.split('/'); if(parts.length===3)return parts[2]+'-'+parts[1].padStart(2,'0'); return nowMonth()}
 function movsInMonth(month=selectedMonth){return (data.movs||[]).filter(m=>movMonth(m)===month)}
 function jobsInMonth(month=selectedMonth){return (data.jobs||[]).filter(j=>!j.dataEvento || String(j.dataEvento).slice(0,7)===month)}
-function show(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');closeFab();render();updateFab()}
+function show(id,btn){
+
+  document
+    .querySelectorAll('.section')
+    .forEach(s=>s.classList.remove('active'));
+
+  const section=document.getElementById(id);
+
+  if(section){
+    section.classList.add('active');
+  }
+
+  document
+    .querySelectorAll('.tab')
+    .forEach(t=>t.classList.remove('active'));
+
+  if(btn){
+    btn.classList.add('active');
+  }
+
+  closeFab();
+  render();
+  updateFab();
+}
+function openNavMenu(){
+
+  const menu=document.getElementById('navMenuOverlay');
+
+  if(menu){
+    menu.classList.add('open');
+  }
+
+  document.body.style.overflow='hidden';
+}
+
+
+function closeNavMenu(){
+
+  const menu=document.getElementById('navMenuOverlay');
+
+  if(menu){
+    menu.classList.remove('open');
+  }
+
+  document.body.style.overflow='';
+}
+
+
+function goFromMenu(id){
+
+  const menuBtn=document.getElementById('navMenuBtn');
+
+  closeNavMenu();
+
+  show(id,menuBtn);
+}
 function setTipo(t){tipo=t;tabGasto.className='pill'+(t==='gasto'?' activeG':'');tabEntrada.className='pill'+(t==='entrada'?' activeE':'');movCat.style.display=t==='entrada'?'none':''}
 
 function debtAppliesInMonth(d, month){
