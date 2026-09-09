@@ -2827,8 +2827,25 @@ function renderCreditCards(){
   }
 }
 
+function updateMovMonthInfo(){
+  const el=document.getElementById('movMonthInfoValue');
+  if(!el) return;
 
+  const [ano,mes]=selectedMonth.split('-');
+
+  const texto=new Date(
+    Number(ano),
+    Number(mes)-1,
+    1
+  ).toLocaleDateString('pt-BR',{
+    month:'long',
+    year:'numeric'
+  });
+
+  el.textContent=texto.toUpperCase();
+}
 function openMovModal(){
+  updateMovMonthInfo();
   const m=document.getElementById('movModal');
   if(m){m.classList.add('open');setTimeout(()=>{const i=document.getElementById('movNome'); if(i)i.focus()},80)}
 }
