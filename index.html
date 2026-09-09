@@ -914,7 +914,10 @@ input::placeholder,textarea::placeholder{
 .formCard{display:none!important}
 .formCard.open{display:block!important}
 .fabWrap{
-  position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;
+  position:fixed;
+  right:18px;
+  bottom:calc(96px + env(safe-area-inset-bottom));
+  z-index:60;
   display:flex;flex-direction:column;align-items:flex-end;gap:10px;
 }
 .fabMenu{display:none;flex-direction:column;gap:8px;align-items:flex-end}
@@ -1738,11 +1741,9 @@ margin-top:2px!important;
 
 
 /* Beta 8: Home consulta, cadastro no + e Configurações separadas */
-.tabs{grid-template-columns:repeat(7,1fr)!important;gap:3px!important}
-.tab{font-size:.58rem!important;padding:8px 1px!important;border-radius:16px!important}
-.tab b{font-size:.92rem!important}
+
 .fabBtn{width:58px!important;height:58px!important;border-radius:18px!important;font-size:2rem!important}
-.fabWrap{right:18px!important;bottom:calc(88px + env(safe-area-inset-bottom))!important}
+.fabWrap{right:18px!important;bottom:calc(96px + env(safe-area-inset-bottom))!important}
 .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(14px);z-index:90;display:none;align-items:flex-end;justify-content:center;padding:16px 16px calc(92px + env(safe-area-inset-bottom))}
 .modalOverlay.open{display:flex;animation:fade .18s ease}
 .modalCard{width:min(520px,100%);background:linear-gradient(180deg,rgba(24,24,25,.98),rgba(8,8,9,.98));border:1px solid rgba(255,255,255,.16);border-radius:28px;padding:18px;box-shadow:0 30px 80px rgba(0,0,0,.65)}
@@ -2084,90 +2085,6 @@ nav.tabs .tab b{font-size:1rem}
   font-size:.66rem;
 }
 
-/* ==================================
-   NOVA NAVEGAÇÃO INFERIOR — SAN
-   ================================== */
-
-.tabs{
-  position:fixed;
-
-  left:50%;
-  transform:translateX(-50%);
-
-  bottom:calc(10px + env(safe-area-inset-bottom));
-
-  z-index:1000;
-
-  width:calc(100% - 28px);
-  max-width:430px;
-
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:8px;
-
-  padding:10px 12px;
-
-  background:rgba(8,8,8,.94);
-
-  border:1px solid rgba(255,255,255,.10);
-  border-radius:24px;
-
-  -webkit-backdrop-filter:blur(22px);
-  backdrop-filter:blur(22px);
-
-  box-shadow:
-    0 12px 35px rgba(0,0,0,.45);
-}
-
-.tabs .tab{
-  min-width:0;
-  height:58px;
-
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:5px;
-
-  padding:7px 4px;
-
-  border:1px solid transparent;
-  border-radius:16px;
-
-  background:transparent;
-  color:#777780;
-
-  transition:
-    background .2s ease,
-    color .2s ease,
-    transform .15s ease;
-}
-
-.tabs .tab.active{
-  color:#fff;
-  background:rgba(255,255,255,.11);
-  border-color:rgba(255,255,255,.08);
-}
-
-.tabIcon{
-  width:27px;
-  height:27px;
-  display:grid;
-  place-items:center;
-}
-
-.tabIcon svg{
-  width:27px;
-  height:27px;
-  display:block;
-}
-
-.tabLabel{
-  font-size:.68rem;
-  font-weight:800;
-  line-height:1;
-}
-
 
 /* ================================
    MENU INFERIOR
@@ -2346,6 +2263,60 @@ nav.tabs .tab b{font-size:1rem}
   font-weight:500;
 
   color:var(--muted);
+}
+
+/* BOTÃO ÚNICO DE NAVEGAÇÃO */
+
+.navFloatingButton{
+  position:fixed;
+
+  right:18px;
+bottom:calc(22px + env(safe-area-inset-bottom));
+
+  z-index:1100;
+
+  width:58px;
+  height:58px;
+
+  display:grid;
+  place-items:center;
+
+  border:none;
+  border-radius:18px;
+
+  background:#151515;
+  color:#fff;
+
+  box-shadow:
+    0 12px 30px rgba(0,0,0,.45),
+    inset 0 0 0 1px rgba(255,255,255,.10);
+
+  -webkit-backdrop-filter:blur(18px);
+  backdrop-filter:blur(18px);
+
+  transition:
+    transform .15s ease,
+    background .2s ease;
+}
+
+.navFloatingButton:active{
+  transform:scale(.92);
+  background:#222;
+}
+
+.navFloatingButton svg{
+  width:26px;
+  height:26px;
+}
+
+.navFloatingButton:active{
+  transform:scale(.92);
+  background:#242424;
+}
+
+.navFloatingButton svg{
+  width:27px;
+  height:27px;
 }
 
 </style>
@@ -2838,137 +2809,24 @@ nav.tabs .tab b{font-size:1rem}
 
   </div>
 </div>
-<nav class="tabs">
+<button
+  id="navMenuBtn"
+  class="navFloatingButton"
+  onclick="openNavMenu()"
+  aria-label="Abrir menu">
 
-  <!-- INÍCIO -->
-  <button
-    id="navHome"
-    class="tab active"
-    onclick="show('home',this)">
+  <svg viewBox="0 0 24 24" fill="none">
+    <rect x="4" y="4" width="6" height="6" rx="1.5"
+      stroke="currentColor" stroke-width="1.8"/>
+    <rect x="14" y="4" width="6" height="6" rx="1.5"
+      stroke="currentColor" stroke-width="1.8"/>
+    <rect x="4" y="14" width="6" height="6" rx="1.5"
+      stroke="currentColor" stroke-width="1.8"/>
+    <rect x="14" y="14" width="6" height="6" rx="1.5"
+      stroke="currentColor" stroke-width="1.8"/>
+  </svg>
 
-    <span class="tabIcon">
-      <svg viewBox="0 0 24 24" fill="none">
-        <path d="M3 10.5L12 3l9 7.5"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"/>
-        <path d="M5.5 9.5V21h13V9.5"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linejoin="round"/>
-        <path d="M9.5 21v-6h5v6"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linejoin="round"/>
-      </svg>
-    </span>
-
-    <span class="tabLabel">Início</span>
-  </button>
-
-
-  <!-- CARTÃO -->
-  <button
-    id="navCard"
-    class="tab"
-    onclick="show('cartao',this)">
-
-    <span class="tabIcon">
-      <svg viewBox="0 0 24 24" fill="none">
-        <rect x="2.5"
-              y="5"
-              width="19"
-              height="14"
-              rx="3"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <path d="M3 9h18"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <path d="M6.5 15h4"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"/>
-      </svg>
-    </span>
-
-    <span class="tabLabel">Cartão</span>
-  </button>
-
-
-  <!-- JOBS -->
-  <button
-    id="navJobs"
-    class="tab"
-    onclick="show('video',this)">
-
-    <span class="tabIcon">
-      <svg viewBox="0 0 24 24" fill="none">
-        <rect x="3"
-              y="7"
-              width="18"
-              height="13"
-              rx="2.5"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <path d="M3.5 11h17"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <path d="M6 7l3-4M11 7l3-4M16 7l3-4"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"/>
-      </svg>
-    </span>
-
-    <span class="tabLabel">Jobs</span>
-  </button>
-
-
-  <!-- MENU -->
-  <button
-    id="navMenuBtn"
-    class="tab"
-    onclick="openNavMenu()">
-
-    <span class="tabIcon">
-      <svg viewBox="0 0 24 24" fill="none">
-        <rect x="4"
-              y="4"
-              width="6"
-              height="6"
-              rx="1.5"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <rect x="14"
-              y="4"
-              width="6"
-              height="6"
-              rx="1.5"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <rect x="4"
-              y="14"
-              width="6"
-              height="6"
-              rx="1.5"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-        <rect x="14"
-              y="14"
-              width="6"
-              height="6"
-              rx="1.5"
-              stroke="currentColor"
-              stroke-width="1.8"/>
-      </svg>
-    </span>
-
-    <span class="tabLabel">Menu</span>
-  </button>
-
-</nav>
+</button>
 
 <div
   class="navMenuOverlay"
@@ -2993,43 +2851,64 @@ nav.tabs .tab b{font-size:1rem}
     </div>
 
 
-    <div class="navMenuGrid">
+   <div class="navMenuGrid">
 
-      <button onclick="goFromMenu('dividas')">
-        <span class="navMenuIcon">▦</span>
-        <span>
-          <b>Dívidas</b>
-          <small>Contas e parcelas</small>
-        </span>
-      </button>
+  <button onclick="goFromMenu('home')">
+    <span class="navMenuIcon">⌂</span>
+    <span>
+      <b>Início</b>
+      <small>Visão geral financeira</small>
+    </span>
+  </button>
 
-      <button onclick="goFromMenu('dash')">
-        <span class="navMenuIcon">▥</span>
-        <span>
-          <b>Dashboard</b>
-          <small>Resumo financeiro</small>
-        </span>
-      </button>
+  <button onclick="goFromMenu('dividas')">
+    <span class="navMenuIcon">▦</span>
+    <span>
+      <b>Dívidas</b>
+      <small>Contas e parcelas</small>
+    </span>
+  </button>
 
-      <button onclick="goFromMenu('desejos')">
-        <span class="navMenuIcon">◇</span>
-        <span>
-          <b>Metas</b>
-          <small>Objetivos e desejos</small>
-        </span>
-      </button>
+  <button onclick="goFromMenu('cartao')">
+    <span class="navMenuIcon">▭</span>
+    <span>
+      <b>Cartão</b>
+      <small>Faturas e compras</small>
+    </span>
+  </button>
 
-      <button onclick="goFromMenu('config')">
-        <span class="navMenuIcon">⚙︎</span>
-        <span>
-          <b>Configurações</b>
-          <small>Backup e ajustes</small>
-        </span>
-      </button>
+  <button onclick="goFromMenu('video')">
+    <span class="navMenuIcon">▣</span>
+    <span>
+      <b>Jobs</b>
+      <small>SAN Business</small>
+    </span>
+  </button>
 
-    </div>
+  <button onclick="goFromMenu('dash')">
+    <span class="navMenuIcon">▥</span>
+    <span>
+      <b>Dashboard</b>
+      <small>Análises financeiras</small>
+    </span>
+  </button>
 
-  </div>
+  <button onclick="goFromMenu('desejos')">
+    <span class="navMenuIcon">◇</span>
+    <span>
+      <b>Metas</b>
+      <small>Objetivos e desejos</small>
+    </span>
+  </button>
+
+  <button onclick="goFromMenu('config')">
+    <span class="navMenuIcon">⚙︎</span>
+    <span>
+      <b>Configurações</b>
+      <small>Backup e ajustes</small>
+    </span>
+  </button>
+
 </div>
 
 <script>
@@ -3151,11 +3030,9 @@ function closeNavMenu(){
 
 function goFromMenu(id){
 
-  const menuBtn=document.getElementById('navMenuBtn');
-
   closeNavMenu();
 
-  show(id,menuBtn);
+  show(id,null);
 }
 function setTipo(t){tipo=t;tabGasto.className='pill'+(t==='gasto'?' activeG':'');tabEntrada.className='pill'+(t==='entrada'?' activeE':'');movCat.style.display=t==='entrada'?'none':''}
 
