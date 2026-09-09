@@ -1868,6 +1868,124 @@ nav.tabs .tab b{font-size:1rem}
   .projectionBox,.businessBox{padding:12px}
   .calDay{min-height:46px;padding:6px 4px}
 }
+/* =========================
+   CARTÕES COMPACTOS
+   ========================= */
+
+.creditCompact{
+  margin-bottom:10px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;
+  background:rgba(255,255,255,.035);
+  overflow:hidden;
+}
+
+.creditSummary{
+  list-style:none;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto 18px;
+  align-items:center;
+  gap:12px;
+  padding:15px 16px;
+  cursor:pointer;
+}
+
+.creditSummary::-webkit-details-marker{
+  display:none;
+}
+
+.creditName{
+  font-size:.95rem;
+  font-weight:900;
+  color:#fff;
+}
+
+.creditMeta{
+  margin-top:5px;
+  font-size:.68rem;
+  color:var(--muted);
+}
+
+.creditCompactRight{
+  text-align:right;
+}
+
+.creditInvoice{
+  font-family:'Space Mono',monospace;
+  font-size:.82rem;
+  font-weight:700;
+  color:var(--yellow);
+}
+
+.creditStatus{
+  margin-top:4px;
+  font-family:'Space Mono',monospace;
+  font-size:.5rem;
+  letter-spacing:1px;
+  font-weight:700;
+}
+
+.creditStatus.open{
+  color:var(--yellow);
+}
+
+.creditStatus.paid{
+  color:var(--green);
+}
+
+.creditChevron{
+  color:#777;
+  font-size:1.15rem;
+  transition:.2s;
+}
+
+.creditCompact[open] .creditChevron{
+  transform:rotate(90deg);
+}
+
+.creditExpanded{
+  border-top:1px solid rgba(255,255,255,.08);
+  padding:13px 16px 15px;
+}
+
+.creditInfoGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:12px;
+}
+
+.creditInfoBox{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  padding:10px;
+}
+
+.creditInfoBox span{
+  display:block;
+  color:var(--muted);
+  font-size:.58rem;
+  margin-bottom:4px;
+}
+
+.creditInfoBox b{
+  font-family:'Space Mono',monospace;
+  font-size:.72rem;
+}
+
+.creditCompact .cardActionRow{
+  display:grid;
+  grid-template-columns:1fr .75fr;
+  gap:7px;
+  margin-top:12px;
+}
+
+.creditCompact .cardActionRow button{
+  min-width:0;
+  padding:10px 6px;
+  font-size:.66rem;
+}
 </style>
 
 </head>
@@ -2138,15 +2256,6 @@ nav.tabs .tab b{font-size:1rem}
         <input id="purchaseInicio" type="month">
       </div>
       <button class="primary" onclick="addCreditPurchase()">LANÇAR COMPRA</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">📊 Resumo dos cartões</div>
-      <div class="miniGrid">
-        <div class="mini"><span>FATURA MÊS</span><strong id="cardInvoice" class="yellow">R$ 0</strong></div>
-        <div class="mini"><span>LIMITE USADO</span><strong id="cardUsed" class="red">R$ 0</strong></div>
-        <div class="mini"><span>DISPONÍVEL</span><strong id="cardAvailable" class="green">R$ 0</strong></div>
       </div>
     </div>
 
@@ -3153,19 +3262,113 @@ function renderCreditCards(){
           ? `<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desmarcar pagamento</button>`
           : `<button class="ghost" onclick="payCreditInvoice('${c.id}','${selectedMonth}')">Pagar fatura</button>`)
         : '';
-      return `<div class="card">
-        <div class="debtTop">
-          <div>
-            <div class="debtName">💳 ${escapeHtml(c.nome)}</div>
-            <div class="debtMeta">Vence dia ${String(c.vencimento||10).padStart(2,'0')} • fecha dia ${String(c.fechamento||1).padStart(2,'0')}</div>
-            <div class="debtMeta">Fatura ${monthName(selectedMonth)}: ${fmt(s.invoice)} • limite comprometido: ${fmt(s.used)}</div>
-            <span class="invoiceTag ${s.paid?'paid':'open'}">${s.paid?'✓ FATURA PAGA':'• FATURA '+(s.invoice>0?'ABERTA':'SEM LANÇAMENTOS')}</span>
-          </div>
-          <div class="val ${s.available<0?'red':'green'}">${fmt(s.available)}</div>
-        </div>
-        <div class="progressBg" style="margin-top:12px"><div class="progressFill" style="width:${pct}%;background:${pct<70?'#35f477':pct<90?'#e5c36a':'#ff5265'}"></div></div>
-        <div class="cardActionRow">${payBtn}<button class="ghost danger" onclick="delCreditCard('${c.id}')">Apagar cartão</button></div>
-      </div>`
+      return `
+<details class="creditCompact">
+
+  <summary class="creditSummary">
+
+    <div>
+      <div class="creditName">
+        💳 ${escapeHtml(c.nome)}
+      </div>
+
+      <div class="creditMeta">
+        vence dia ${String(c.vencimento||10).padStart(2,'0')}
+        • fecha dia ${String(c.fechamento||1).padStart(2,'0')}
+      </div>
+    </div>
+
+
+    <div class="creditCompactRight">
+
+      <div class="creditInvoice">
+        ${fmt(s.invoice)}
+      </div>
+
+      <div class="creditStatus ${s.paid?'paid':'open'}">
+        ${
+          s.paid
+            ? '● PAGA'
+            : s.invoice>0
+              ? '● ABERTA'
+              : '● SEM LANÇAMENTOS'
+        }
+      </div>
+
+    </div>
+
+
+    <div class="creditChevron">›</div>
+
+  </summary>
+
+
+  <div class="creditExpanded">
+
+    <div class="creditInfoGrid">
+
+      <div class="creditInfoBox">
+        <span>FATURA ${monthName(selectedMonth).toUpperCase()}</span>
+        <b class="yellow">${fmt(s.invoice)}</b>
+      </div>
+
+      <div class="creditInfoBox">
+        <span>LIMITE TOTAL</span>
+        <b>${fmt(c.limite||0)}</b>
+      </div>
+
+      <div class="creditInfoBox">
+        <span>UTILIZADO</span>
+        <b class="red">${fmt(s.used)}</b>
+      </div>
+
+      <div class="creditInfoBox">
+        <span>DISPONÍVEL</span>
+        <b class="${s.available<0?'red':'green'}">
+          ${fmt(s.available)}
+        </b>
+      </div>
+
+    </div>
+
+
+    <div class="progressBg">
+      <div
+        class="progressFill"
+        style="
+          width:${pct}%;
+          background:${
+            pct<70
+              ? '#35f477'
+              : pct<90
+                ? '#e5c36a'
+                : '#ff5265'
+          };
+        ">
+      </div>
+    </div>
+
+
+    <div class="creditMeta" style="margin-top:9px">
+      ${pct}% do limite comprometido
+    </div>
+
+
+    <div class="cardActionRow">
+
+      ${payBtn}
+
+      <button
+        class="ghost danger"
+        onclick="delCreditCard('${c.id}')">
+        Apagar
+      </button>
+
+    </div>
+
+  </div>
+
+</details>`
     }).join('')||'<div class="empty">Nenhum cartão cadastrado ainda.</div>';
   }
 
