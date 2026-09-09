@@ -3009,6 +3009,7 @@ function exportCalendarICS(){
 }
 
 function render(){
+  updateMovMonthInfo();
   if(!data.creditCards) data.creditCards=[]; if(!data.creditPurchases) data.creditPurchases=[];
   monthLabel.textContent=monthLabelSmart(selectedMonth);
   syncMonthPicker();
