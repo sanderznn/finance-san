@@ -43,7 +43,27 @@
   --yellow:#e5c36a;
   --blue:#82b9ff;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  button,
+a,
+input,
+select,
+textarea,
+.card,
+.item,
+.tab,
+.pill,
+.modalCard,
+.debtCard,
+.jobCard {
+  touch-action: manipulation;
+}
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
 html,body{
   width:100%;
   overflow-x:hidden;
