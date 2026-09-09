@@ -346,6 +346,137 @@ button.ghost{
 .danger{color:var(--red)!important;border-color:rgba(255,82,101,.35)!important}
 .smallBtns{display:flex;gap:8px;margin-top:10px}
 .smallBtns button{flex:1}
+  /* =========================
+   DÍVIDAS COMPACTAS
+   ========================= */
+
+.debtCompact{
+  margin-bottom:10px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;
+  background:rgba(255,255,255,.035);
+  overflow:hidden;
+}
+
+.debtSummary{
+  list-style:none;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto 18px;
+  align-items:center;
+  gap:12px;
+  padding:15px 16px;
+  cursor:pointer;
+}
+
+.debtSummary::-webkit-details-marker{
+  display:none;
+}
+
+.debtCompactName{
+  font-size:.95rem;
+  font-weight:900;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.debtCompactMeta{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:5px;
+  font-size:.68rem;
+  color:var(--muted);
+}
+
+.debtTypeTag{
+  font-family:'Space Mono',monospace;
+  font-size:.52rem;
+  letter-spacing:1px;
+  padding:3px 7px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:999px;
+  color:#ccc;
+}
+
+.debtCompactRight{
+  text-align:right;
+}
+
+.debtCompactValue{
+  font-family:'Space Mono',monospace;
+  font-size:.8rem;
+  font-weight:700;
+  white-space:nowrap;
+  color:var(--yellow);
+}
+
+.debtStatus{
+  margin-top:4px;
+  font-family:'Space Mono',monospace;
+  font-size:.5rem;
+  letter-spacing:1px;
+  font-weight:700;
+}
+
+.debtStatus.pending{
+  color:var(--red);
+}
+
+.debtStatus.paid{
+  color:var(--green);
+}
+
+.debtChevron{
+  color:#777;
+  font-size:1.15rem;
+  transition:.2s;
+}
+
+.debtCompact[open] .debtChevron{
+  transform:rotate(90deg);
+}
+  .debtExpanded{
+  border-top:1px solid rgba(255,255,255,.08);
+  padding:13px 16px 15px;
+}
+
+.debtExpandedInfo{
+  color:var(--muted);
+  font-size:.72rem;
+  line-height:1.45;
+  margin-bottom:10px;
+}
+
+.debtCompact .progressBg{
+  height:5px;
+  margin-top:9px;
+}
+
+.debtCompact .monthDots{
+  margin-top:10px;
+}
+
+.debtCompact .dot{
+  width:23px;
+  height:23px;
+}
+
+.debtCompact .debtActions{
+  display:grid;
+  grid-template-columns:1.15fr 1fr .72fr;
+  gap:7px;
+  margin-top:12px;
+}
+
+.debtCompact .debtActions button{
+  padding:10px 6px;
+  border-radius:12px;
+  font-size:.66rem;
+  min-width:0;
+}
 @media(max-width:390px){
   .container{padding:14px}
   .logoText h1{font-size:1.05rem;letter-spacing:3.4px}
