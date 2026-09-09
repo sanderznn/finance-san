@@ -2279,7 +2279,117 @@ function addMov(){
   data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:selectedMonth,date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   movNome.value='';movValor.value='';save();render();return true
 }
-function delMov(id){
+function editMov(id){
+
+  const m=(data.movs||[]).find(x=>x.id===id);
+
+  if(!m){
+    alert('Lançamento não encontrado.');
+    return;
+  }
+
+  const linkedCard=(data.creditInvoicePayments||[])
+    .some(p=>p.movId===id);
+
+  const linkedJob=(data.jobs||[])
+    .some(j=>(j.costs||[]).some(c=>c.movId===id));
+
+  if(linkedCard || linkedJob){
+    alert(
+      'Esse lançamento está vinculado a outro registro. ' +
+      'Edite pela área de origem.'
+    );
+    return;
+  }
+
+  const novoNome=prompt(
+    'Nome do lançamento:',
+    m.nome || ''
+  );
+
+  if(novoNome===null) return;
+
+  if(!novoNome.trim()){
+    alert('O nome não pode ficar vazio.');
+    return;
+  }
+
+  const novoValorTexto=prompt(
+    'Valor:',
+    String(m.valor || '').replace('.',',')
+  );
+
+  if(novoValorTexto===null) return;
+
+  const novoValor=parseFloat(
+    novoValorTexto.replace(',','.')
+  );
+
+  if(!novoValor || novoValor<=0){
+    alert('Digite um valor válido.');
+    return;
+  }
+
+  const novoTipo=prompt(
+    'Tipo: entrada ou gasto',
+    m.tipo || 'gasto'
+  );
+
+  if(novoTipo===null) return;
+
+  const tipoFinal=novoTipo.trim().toLowerCase();
+
+  if(
+    tipoFinal!=='entrada' &&
+    tipoFinal!=='gasto'
+  ){
+    alert('Digite somente: entrada ou gasto.');
+    return;
+  }
+
+  let novaCategoria=m.cat || '🎯 Outros';
+
+  if(tipoFinal==='gasto'){
+
+    const cat=prompt(
+      'Categoria:',
+      m.cat || '🎯 Outros'
+    );
+
+    if(cat===null) return;
+
+    novaCategoria=cat.trim() || '🎯 Outros';
+
+  }else{
+
+    novaCategoria='💰';
+
+  }
+
+  const novoMes=prompt(
+    'Mês no formato AAAA-MM:',
+    m.ym || selectedMonth
+  );
+
+  if(novoMes===null) return;
+
+  if(!/^\d{4}-\d{2}$/.test(novoMes)){
+    alert('Use o formato AAAA-MM. Exemplo: 2026-09');
+    return;
+  }
+
+  m.nome=novoNome.trim();
+  m.valor=novoValor;
+  m.tipo=tipoFinal;
+  m.cat=novaCategoria;
+  m.ym=novoMes;
+
+  save();
+  render();
+
+  alert('Lançamento atualizado.');
+}
+  function delMov(id){
   if(!confirm('Apagar este lançamento?')) return;
   data.movs=(data.movs||[]).filter(m=>m.id!==id);
   data.creditInvoicePayments=(data.creditInvoicePayments||[]).filter(p=>p.movId!==id);
