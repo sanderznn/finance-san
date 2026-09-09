@@ -2347,20 +2347,45 @@ function addMov(){
   data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:selectedMonth,date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   movNome.value='';movValor.value='';save();render();return true
 }
+let editingMovId = null;
+let editingMovTipo = 'gasto';
+
+function setEditTipo(t){
+  editingMovTipo = t;
+
+  const gasto = document.getElementById('editTabGasto');
+  const entrada = document.getElementById('editTabEntrada');
+  const categoria = document.getElementById('editMovCat');
+
+  if(gasto){
+    gasto.className = 'pill' + (t === 'gasto' ? ' activeG' : '');
+  }
+
+  if(entrada){
+    entrada.className = 'pill' + (t === 'entrada' ? ' activeE' : '');
+  }
+
+  if(categoria){
+    categoria.style.display = t === 'entrada' ? 'none' : '';
+  }
+}
+
 function editMov(id){
 
-  const m=(data.movs||[]).find(x=>x.id===id);
+  const m = (data.movs || []).find(x => x.id === id);
 
   if(!m){
     alert('Lançamento não encontrado.');
     return;
   }
 
-  const linkedCard=(data.creditInvoicePayments||[])
-    .some(p=>p.movId===id);
+  const linkedCard = (data.creditInvoicePayments || [])
+    .some(p => p.movId === id);
 
-  const linkedJob=(data.jobs||[])
-    .some(j=>(j.costs||[]).some(c=>c.movId===id));
+  const linkedJob = (data.jobs || [])
+    .some(j =>
+      (j.costs || []).some(c => c.movId === id)
+    );
 
   if(linkedCard || linkedJob){
     alert(
@@ -2370,93 +2395,98 @@ function editMov(id){
     return;
   }
 
-  const novoNome=prompt(
-    'Nome do lançamento:',
-    m.nome || ''
-  );
+  editingMovId = id;
 
-  if(novoNome===null) return;
+  document.getElementById('editMovNome').value = m.nome || '';
+  document.getElementById('editMovValor').value = m.valor || '';
+  document.getElementById('editMovMes').value =
+    m.ym || selectedMonth;
 
-  if(!novoNome.trim()){
-    alert('O nome não pode ficar vazio.');
+  setEditTipo(m.tipo || 'gasto');
+
+  const cat = document.getElementById('editMovCat');
+
+  if(cat && m.tipo !== 'entrada'){
+    const existe = [...cat.options]
+      .some(option => option.value === m.cat);
+
+    cat.value = existe ? m.cat : '🎯 Outros';
+  }
+
+  const modal = document.getElementById('editMovModal');
+
+  if(modal){
+    modal.classList.add('open');
+  }
+}
+
+function closeEditMovModal(){
+
+  const modal = document.getElementById('editMovModal');
+
+  if(modal){
+    modal.classList.remove('open');
+  }
+
+  editingMovId = null;
+}
+
+function saveEditMov(){
+
+  if(!editingMovId){
+    alert('Nenhum lançamento selecionado.');
     return;
   }
 
-  const novoValorTexto=prompt(
-    'Valor:',
-    String(m.valor || '').replace('.',',')
-  );
+  const m = (data.movs || [])
+    .find(x => x.id === editingMovId);
 
-  if(novoValorTexto===null) return;
+  if(!m){
+    alert('Lançamento não encontrado.');
+    return;
+  }
 
-  const novoValor=parseFloat(
-    novoValorTexto.replace(',','.')
-  );
+  const nome =
+    document.getElementById('editMovNome').value.trim();
 
-  if(!novoValor || novoValor<=0){
+  const valor =
+    parseFloat(document.getElementById('editMovValor').value);
+
+  const mes =
+    document.getElementById('editMovMes').value;
+
+  if(!nome){
+    alert('Digite o nome do lançamento.');
+    return;
+  }
+
+  if(!valor || valor <= 0){
     alert('Digite um valor válido.');
     return;
   }
 
-  const novoTipo=prompt(
-    'Tipo: entrada ou gasto',
-    m.tipo || 'gasto'
-  );
-
-  if(novoTipo===null) return;
-
-  const tipoFinal=novoTipo.trim().toLowerCase();
-
-  if(
-    tipoFinal!=='entrada' &&
-    tipoFinal!=='gasto'
-  ){
-    alert('Digite somente: entrada ou gasto.');
+  if(!/^\d{4}-\d{2}$/.test(mes)){
+    alert('Escolha um mês válido.');
     return;
   }
 
-  let novaCategoria=m.cat || '🎯 Outros';
+  m.nome = nome;
+  m.valor = valor;
+  m.tipo = editingMovTipo;
+  m.ym = mes;
 
-  if(tipoFinal==='gasto'){
-
-    const cat=prompt(
-      'Categoria:',
-      m.cat || '🎯 Outros'
-    );
-
-    if(cat===null) return;
-
-    novaCategoria=cat.trim() || '🎯 Outros';
-
+  if(editingMovTipo === 'entrada'){
+    m.cat = '💰';
   }else{
-
-    novaCategoria='💰';
-
+    m.cat =
+      document.getElementById('editMovCat').value;
   }
-
-  const novoMes=prompt(
-    'Mês no formato AAAA-MM:',
-    m.ym || selectedMonth
-  );
-
-  if(novoMes===null) return;
-
-  if(!/^\d{4}-\d{2}$/.test(novoMes)){
-    alert('Use o formato AAAA-MM. Exemplo: 2026-09');
-    return;
-  }
-
-  m.nome=novoNome.trim();
-  m.valor=novoValor;
-  m.tipo=tipoFinal;
-  m.cat=novaCategoria;
-  m.ym=novoMes;
 
   save();
   render();
-
-  alert('Lançamento atualizado.');
+  closeEditMovModal();
 }
+
   function delMov(id){
   if(!confirm('Apagar este lançamento?')) return;
   data.movs=(data.movs||[]).filter(m=>m.id!==id);
