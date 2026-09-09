@@ -3053,6 +3053,9 @@ function render(){
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="val ${m.tipo==='entrada'?'green':'red'}">${m.tipo==='entrada'?'+':'-'}${fmt(parseFloat(m.valor)||0)}</div>
+      <button class="ghost"
+  style="padding:7px 9px"
+  onclick="editMov('${m.id}')">✏️</button>
       <button class="ghost danger" style="padding:7px 9px" onclick="delMov('${m.id}')">×</button>
     </div>
   </div>`).join('')||'<div class="empty">Nenhum lançamento ainda.</div>';
