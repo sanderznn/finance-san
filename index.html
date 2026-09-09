@@ -2262,7 +2262,7 @@ function addMov(){
   const nome=movNome.value.trim(), valor=parseFloat(movValor.value);
   if(!nome||!valor){alert('Preenche nome e valor.');return false}
   if(valor>50000 && !confirm('Valor muito alto. Confirmar lançamento?')) return false;
-  data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:nowMonth(),date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+  data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:selectedMonth,date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   movNome.value='';movValor.value='';save();render();return true
 }
 function delMov(id){
