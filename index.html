@@ -429,6 +429,10 @@ button.ghost{
   color:var(--green);
 }
 
+.debtStatus.neutral{
+  color:var(--muted);
+}
+
 .debtChevron{
   color:#777;
   font-size:1.15rem;
@@ -3444,24 +3448,166 @@ function render(){
         dots+=`<button class="dot ${d.pagos.includes(i)?'paid':i===idxMes?'now':''}" title="${venc}" onclick="toggleDebt('${d.id}',${i})">${i+1}</button>`
       }
     }
-    return `<div class="card debtCard" style="${isCurrent?'':'opacity:.55'}">
-      <div class="debtTop">
-        <div>
-          <div class="debtName">${d.nome}</div>
-          <div class="debtMeta">${isCurrent ? 'Conta deste mês • '+(isPaidThisMonth?'paga':'pendente') : 'Não cai neste mês'}</div>
-          <div class="debtMeta">${d.fixa ? 'Conta fixa mensal • histórico pago em '+((d.paidMonths||[]).length)+' mês(es)' : paid+'/'+d.meses+' meses pagos • faltam '+left+' • restante total '+fmt(rest)}</div>
-          <div class="debtMeta">📅 Vence todo dia ${String(d.dia||10).padStart(2,'0')} ${isCurrent && !d.fixa ? '• parcela '+(idxMes+1)+'/'+d.meses : ''}</div>
-        </div>
-        <div class="val ${isPaidThisMonth?'green':'yellow'}">${isCurrent?fmt(d.valor):'—'}</div>
+    return `
+<details class="debtCompact" style="${isCurrent?'':'opacity:.55'}">
+
+  <summary class="debtSummary">
+
+    <div>
+      <div class="debtCompactName">
+        ${escapeHtml(d.nome)}
       </div>
-      <div class="progressBg" style="margin-top:12px"><div class="progressFill" style="width:${d.fixa?(isPaidThisMonth?100:0):Math.round((paid/Math.max(1,d.meses))*100)}%;background:#00f06a"></div></div>
-      <div class="monthDots">${dots}</div>
-      <div class="debtActions">
-        <button class="ghost" ${isCurrent?'':d.fixa?'disabled style="opacity:.4"':''} onclick="toggleDebt('${d.id}',${d.fixa?0:(idxMes>=0?idxMes:(paid<d.meses?paid:d.meses-1))})">${isCurrent?(isPaidThisMonth?'Desmarcar pagamento':'Marcar pago do mês'):(d.fixa?'Ainda não iniciou':'Marcar próxima parcela')}</button>
-        <button class="ghost" onclick="editDebtDay('${d.id}')">Editar vencimento</button>
-        <button class="ghost danger" onclick="delDebt('${d.id}')">Apagar</button>
+
+      <div class="debtCompactMeta">
+
+        <span class="debtTypeTag">
+          ${
+            d.fixa
+              ? 'FIXA'
+              : (isCurrent && idxMes>=0
+                  ? (idxMes+1)+'/'+d.meses
+                  : 'PARCELADA')
+          }
+        </span>
+
+        <span>
+          vence dia ${String(d.dia||10).padStart(2,'0')}
+        </span>
+
       </div>
-    </div>`
+    </div>
+
+    <div class="debtCompactRight">
+
+      <div class="debtCompactValue">
+        ${isCurrent ? fmt(d.valor) : '—'}
+      </div>
+
+      <div class="debtStatus ${
+        !isCurrent
+          ? 'neutral'
+          : isPaidThisMonth
+            ? 'paid'
+            : 'pending'
+      }">
+
+        ${
+          !isCurrent
+            ? 'FORA DO MÊS'
+            : isPaidThisMonth
+              ? '● PAGO'
+              : '● PENDENTE'
+        }
+
+      </div>
+
+    </div>
+
+    <div class="debtChevron">›</div>
+
+  </summary>
+
+
+  <div class="debtExpanded">
+
+    <div class="debtExpandedInfo">
+
+      ${
+        d.fixa
+          ? 'Conta fixa mensal • histórico pago em ' +
+            ((d.paidMonths||[]).length) +
+            ' mês(es)'
+          : paid + '/' + d.meses +
+            ' parcelas pagas • faltam ' +
+            left +
+            ' • restante ' +
+            fmt(rest)
+      }
+
+    </div>
+
+
+    <div class="progressBg">
+      <div
+        class="progressFill"
+        style="
+          width:${
+            d.fixa
+              ? (isPaidThisMonth?100:0)
+              : Math.round(
+                  (paid/Math.max(1,d.meses))*100
+                )
+          }%;
+          background:var(--green);
+        ">
+      </div>
+    </div>
+
+
+    <div class="monthDots">
+      ${dots}
+    </div>
+
+
+    <div class="debtActions">
+
+      <button
+        class="ghost"
+        ${isCurrent?'':d.fixa?'disabled style="opacity:.4"':''}
+        onclick="
+          toggleDebt(
+            '${d.id}',
+            ${
+              d.fixa
+                ? 0
+                : (
+                    idxMes>=0
+                      ? idxMes
+                      : (
+                          paid<d.meses
+                            ? paid
+                            : d.meses-1
+                        )
+                  )
+            }
+          )
+        ">
+
+        ${
+          isCurrent
+            ? (
+                isPaidThisMonth
+                  ? '✓ Desmarcar'
+                  : '✓ Marcar pago'
+              )
+            : (
+                d.fixa
+                  ? 'Ainda não iniciou'
+                  : '✓ Próxima parcela'
+              )
+        }
+
+      </button>
+
+
+      <button
+        class="ghost"
+        onclick="editDebtDay('${d.id}')">
+        ✎ Vencimento
+      </button>
+
+
+      <button
+        class="ghost danger"
+        onclick="delDebt('${d.id}')">
+        Apagar
+      </button>
+
+    </div>
+
+  </div>
+
+</details>`
   }).join('')||'<div class="empty">Nenhuma dívida cadastrada.</div>';
     const monthJobs=jobsInMonth(selectedMonth);
     const paidJobs=monthJobs.filter(j=>isJobPaid(j)).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
