@@ -2138,7 +2138,75 @@ nav.tabs .tab b{font-size:1rem}
     <button class="primary" onclick="if(addMov()) closeMovModal()">REGISTRAR</button>
   </div>
 </div>
+<!-- MODAL EDITAR MOVIMENTO -->
+<div class="modalOverlay" id="editMovModal"
+     onclick="if(event.target===this)closeEditMovModal()">
 
+  <div class="modalCard">
+
+    <div class="modalHead">
+      <div>
+        <div class="eyebrow">editar cadastro</div>
+        <h3>Editar movimento</h3>
+      </div>
+
+      <button class="modalClose"
+              onclick="closeEditMovModal()">×</button>
+    </div>
+
+    <div class="pillTabs">
+      <button id="editTabGasto"
+              class="pill activeG"
+              onclick="setEditTipo('gasto')">
+        Gasto
+      </button>
+
+      <button id="editTabEntrada"
+              class="pill"
+              onclick="setEditTipo('entrada')">
+        Entrada
+      </button>
+    </div>
+
+    <div class="row">
+      <input id="editMovNome"
+             placeholder="Nome do lançamento">
+    </div>
+
+    <div class="row">
+
+      <input id="editMovValor"
+             type="number"
+             min="0"
+             step="0.01"
+             placeholder="Valor">
+
+      <select id="editMovCat">
+        <option>🍔 Comida</option>
+        <option>🚌 Transporte</option>
+        <option>🛒 Compras</option>
+        <option>🎬 Videomaker</option>
+        <option>💳 Cartão</option>
+        <option>💸 Dívida</option>
+        <option>🏠 Casa</option>
+        <option>✨ Beleza</option>
+        <option>🎯 Outros</option>
+      </select>
+
+    </div>
+
+    <div class="row">
+      <input id="editMovMes"
+             type="month">
+    </div>
+
+    <button class="primary"
+            onclick="saveEditMov()">
+      SALVAR ALTERAÇÕES
+    </button>
+
+  </div>
+</div>
 <nav class="tabs">
   <button class="tab active" onclick="show('home',this)"><b>⌂</b>Início</button>
   <button class="tab" onclick="show('dividas',this)"><b>▦</b>Dívidas</button>
