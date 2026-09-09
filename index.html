@@ -3011,7 +3011,7 @@ function render(){
   if(typeof homeStatus!=='undefined') homeStatus.textContent=t.saldo>=0?`Você está positivo este mês. Sobrou ${fmt(t.saldo)} até agora (${sobraPct}% das entradas).`:`Você está negativo este mês em ${fmt(Math.abs(t.saldo))}.`;
   const dicas=['Controle não é prisão. É direção.','Seu dinheiro precisa trabalhar para sua liberdade.','Uma parcela marcada como paga é um passo a menos na dívida.','Todo freela precisa virar parte da sua organização.','Antes de comprar, pergunta: isso aproxima ou afasta da minha meta?'];
   dailyQuote.textContent=dicas[Math.floor(Math.random()*dicas.length)];
-  lastList.innerHTML=movsInMonth(selectedMonth).slice(0,8).map(m=>`<div class="item">
+  lastList.innerHTML=movsInMonth(selectedMonth).map(m=>`<div class="item">
     <div class="itemLeft">
       <div class="icon">${String(m.cat||'🎯').split(' ')[0]}</div>
       <div>
