@@ -44,7 +44,12 @@
   --blue:#82b9ff;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;overflow-x:hidden}
+html,body{
+  width:100%;
+  overflow-x:hidden;
+  touch-action:manipulation;
+  -webkit-text-size-adjust:100%;
+}
 body{
   min-height:100vh;
   background:
