@@ -1986,6 +1986,103 @@ nav.tabs .tab b{font-size:1rem}
   padding:10px 6px;
   font-size:.66rem;
 }
+/* =========================
+   COMPRAS DO CARTÃO COMPACTAS
+   ========================= */
+
+.purchaseCompact{
+  margin-bottom:8px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;
+  background:rgba(255,255,255,.035);
+  overflow:hidden;
+}
+
+.purchaseSummary{
+  list-style:none;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto 18px;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  cursor:pointer;
+}
+
+.purchaseSummary::-webkit-details-marker{
+  display:none;
+}
+
+.purchaseName{
+  font-size:.92rem;
+  font-weight:900;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.purchaseMeta{
+  margin-top:4px;
+  font-size:.67rem;
+  color:var(--muted);
+}
+
+.purchaseRight{
+  text-align:right;
+}
+
+.purchaseValue{
+  font-family:'Space Mono',monospace;
+  font-size:.78rem;
+  font-weight:700;
+  color:var(--yellow);
+  white-space:nowrap;
+}
+
+.purchaseStatus{
+  margin-top:4px;
+  font-family:'Space Mono',monospace;
+  font-size:.5rem;
+  letter-spacing:1px;
+  color:var(--muted);
+}
+
+.purchaseChevron{
+  color:#777;
+  font-size:1.15rem;
+  transition:.2s;
+}
+
+.purchaseCompact[open] .purchaseChevron{
+  transform:rotate(90deg);
+}
+
+.purchaseExpanded{
+  border-top:1px solid rgba(255,255,255,.08);
+  padding:13px 16px 15px;
+}
+
+.purchaseInfo{
+  font-size:.72rem;
+  line-height:1.6;
+  color:var(--muted);
+}
+
+.purchaseInfo b{
+  color:#fff;
+}
+
+.purchaseActions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:12px;
+}
+
+.purchaseActions button{
+  padding:9px 14px;
+  border-radius:12px;
+  font-size:.66rem;
+}
 </style>
 
 </head>
@@ -3381,19 +3478,103 @@ function renderCreditCards(){
       const fim=addMonths(p.inicio,parcelas-1);
       const active=monthsBetween(p.inicio,selectedMonth)>=0 && monthsBetween(p.inicio,selectedMonth)<parcelas;
       const installment=active?monthsBetween(p.inicio,selectedMonth)+1:null;
-      return `<div class="item" style="${active?'':'opacity:.65'}">
-        <div class="itemLeft">
-          <div class="icon">🧾</div>
-          <div>
-            <div class="name">${escapeHtml(p.nome)}</div>
-            <div class="sub">${card?escapeHtml(card.nome):'Cartão apagado'} • ${parcelas}x de ${fmt(valorParcela)} • ${monthName(p.inicio)} até ${monthName(fim)}${active?' • parcela '+installment+'/'+parcelas:''}</div>
-          </div>
-        </div>
-        <div>
-          <div class="val ${active?'yellow':''}">${active?fmt(valorParcela):fmt(p.valor)}</div>
-          <div class="smallBtns"><button class="ghost danger" onclick="delCreditPurchase('${p.id}')">X</button></div>
-        </div>
-      </div>`
+      return `
+<details
+  class="purchaseCompact"
+  style="${active?'':'opacity:.65'}">
+
+  <summary class="purchaseSummary">
+
+    <div>
+
+      <div class="purchaseName">
+        ${escapeHtml(p.nome)}
+      </div>
+
+      <div class="purchaseMeta">
+        ${card ? escapeHtml(card.nome) : 'Cartão apagado'}
+        • ${parcelas}x de ${fmt(valorParcela)}
+        ${
+          active
+            ? ' • parcela '+installment+'/'+parcelas
+            : ''
+        }
+      </div>
+
+    </div>
+
+
+    <div class="purchaseRight">
+
+      <div class="purchaseValue">
+        ${active ? fmt(valorParcela) : fmt(p.valor)}
+      </div>
+
+      <div class="purchaseStatus">
+        ${
+          active
+            ? 'PARCELA '+installment+'/'+parcelas
+            : 'FORA DO MÊS'
+        }
+      </div>
+
+    </div>
+
+
+    <div class="purchaseChevron">›</div>
+
+  </summary>
+
+
+  <div class="purchaseExpanded">
+
+    <div class="purchaseInfo">
+
+      <div>
+        Cartão:
+        <b>${card ? escapeHtml(card.nome) : 'Cartão apagado'}</b>
+      </div>
+
+      <div>
+        Valor total:
+        <b>${fmt(p.valor)}</b>
+      </div>
+
+      <div>
+        Parcelamento:
+        <b>${parcelas}x de ${fmt(valorParcela)}</b>
+      </div>
+
+      <div>
+        Período:
+        <b>${monthName(p.inicio)} até ${monthName(fim)}</b>
+      </div>
+
+      ${
+        active
+          ? `<div>
+               Parcela atual:
+               <b>${installment}/${parcelas}</b>
+             </div>`
+          : ''
+      }
+
+    </div>
+
+
+    <div class="purchaseActions">
+
+      <button
+        class="ghost danger"
+        onclick="delCreditPurchase('${p.id}')">
+        Apagar compra
+      </button>
+
+    </div>
+
+  </div>
+
+</details>`
     }).join('')||'<div class="empty">Nenhuma compra parcelada cadastrada.</div>';
   }
 }
