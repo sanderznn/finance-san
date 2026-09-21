@@ -2451,15 +2451,14 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </div>
 </div>
 
-<div class="card canSpendCard">
+<div class="card canSpendCard" id="canSpendCard">
   <div class="canSpendTop">
     <div>
       <div class="cardTitle">Quanto posso gastar?</div>
       <div class="sub">Sem comprometer suas contas deste mês</div>
     </div>
 
-    <span class="safeBadge">SEGURO</span>
-  </div>
+  <span class="canSpendBadge" id="canSpendBadge">SEGURO</span>
 
   <div id="canSpend" class="canSpendValue">R$ 0,00</div>
 
@@ -4382,6 +4381,40 @@ function render(){
       : 'Seu dinheiro atual já está comprometido.';
   }
 }
+{
+  const cardEl=document.getElementById('canSpendCard');
+  const badgeEl=document.getElementById('canSpendBadge');
+  const valueEl=document.getElementById('canSpend');
+
+  if(cardEl && badgeEl && valueEl){
+
+    if(proj.safe>0){
+      badgeEl.textContent='SEGURO';
+
+      badgeEl.style.color='#70ff8f';
+      badgeEl.style.borderColor='rgba(112,255,143,.35)';
+      badgeEl.style.background='rgba(112,255,143,.10)';
+
+      valueEl.style.color='#70ff8f';
+      cardEl.style.borderColor='rgba(0,240,106,.28)';
+      cardEl.style.background=
+        'linear-gradient(135deg,rgba(0,240,106,.08),rgba(255,255,255,.025))';
+
+    }else{
+      badgeEl.textContent='ATENÇÃO';
+
+      badgeEl.style.color='#ff5c6c';
+      badgeEl.style.borderColor='rgba(255,92,108,.40)';
+      badgeEl.style.background='rgba(255,92,108,.12)';
+
+      valueEl.style.color='#ff5c6c';
+      cardEl.style.borderColor='rgba(255,92,108,.35)';
+      cardEl.style.background=
+        'linear-gradient(135deg,rgba(255,92,108,.10),rgba(255,255,255,.025))';
+    }
+  }
+}
+
 
   if(typeof quickDebtMonth!=='undefined'){
     const debtMonth=currentMonthDebtTotal(selectedMonth);
