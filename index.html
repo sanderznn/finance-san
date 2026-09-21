@@ -2480,6 +2480,57 @@ bottom:calc(22px + env(safe-area-inset-bottom));
     margin-top:10px;
   }
 
+#dividas .debtSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+#dividas .debtSummary .quickBox {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 22px;
+}
+
+#dividas .debtSummary small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+  line-height: 1.5;
+}
+
+#dividas .debtSummary b {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(18px, 5vw, 26px);
+  overflow-wrap: anywhere;
+}
+
+#dividas .debtSummary .debtPending {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(255, 77, 94, .3);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 77, 94, .09),
+    #111
+  );
+}
+
+#dividas .debtPending b {
+  font-size: clamp(32px, 9vw, 44px);
+  font-weight: 900;
+  color: #ff4d5e;
+}
+
+#dividas .debtPending span {
+  display: block;
+  margin-top: 8px;
+  color: #aaa;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 </style>
 
 </head>
@@ -2681,12 +2732,24 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </section>
 
   <section id="dividas" class="section">
-    <div class="title">Dívidas do mês / parceladas</div>
-    <div class="quickSummary">
-      <div class="quickBox"><small>Dívidas mês</small><b id="quickDebtMonth" class="yellow">R$ 0</b></div>
-      <div class="quickBox"><small>Pagas</small><b id="quickDebtPaid" class="green">R$ 0</b></div>
-      <div class="quickBox"><small>Pendentes</small><b id="quickDebtOpen" class="red">R$ 0</b></div>
-    </div>
+  <div class="title">Contas do mês</div>
+    <div class="quickSummary debtSummary">
+  <div class="quickBox debtPending">
+    <small>Falta pagar</small>
+    <b id="quickDebtOpen" class="red">R$ 0</b>
+    <span>Contas em aberto no mês selecionado</span>
+  </div>
+
+  <div class="quickBox">
+    <small>Total do mês</small>
+    <b id="quickDebtMonth">R$ 0</b>
+  </div>
+
+  <div class="quickBox">
+    <small>Já pago</small>
+    <b id="quickDebtPaid" class="green">R$ 0</b>
+  </div>
+</div>
     <div class="card formCard" id="formDebtCard">
       <button class="formToggle" onclick="toggleFormCard('formDebtCard')"><span class="toggleTitle">+ Criar dívida/conta</span><span class="toggleIcon">⌄</span></button>
       <div class="formBody">
