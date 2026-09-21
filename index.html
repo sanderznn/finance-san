@@ -2359,31 +2359,85 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 <div class="container">
   <section id="home" class="section active homePremium">
     <div class="hero homeHeroPro">
-      <div class="homeTopLine">
-        <div>
-          <div class="kicker">saldo disponível</div>
-          <div id="saldo" class="bigMoney">R$ 0,00</div>
-        </div>
-        
-      </div>
-      <div class="miniGrid bankMiniGrid">
-        <div class="mini"><span>ENTROU</span><strong id="totIn" class="green">R$ 0</strong></div>
-        <div class="mini"><span>SAIU</span><strong id="totOut" class="red">R$ 0</strong></div>
-        <div class="mini"><span>DEVO MÊS</span><strong id="saldoHero" class="yellow">R$ 0</strong></div>
-      </div>
-      <div class="homeStatus" id="homeStatus">Carregando resumo do mês...</div>
+  <div class="homeTopLine">
+    <div>
+      <div class="kicker">saldo livre real</div>
+      <div id="saldo" class="bigMoney">R$ 0,00</div>
+    </div>
+  </div>
+
+  <div class="miniGrid bankMiniGrid">
+    <div class="mini">
+      <span>SALDO EM CONTA</span>
+      <strong id="totIn" class="green">R$ 0</strong>
     </div>
 
-    <div class="card">
-      <div class="cardTitle">Projeção do mês</div>
-      <div class="projectionGrid">
-        <div class="projectionBox"><small>Saldo hoje</small><b id="projNow">R$ 0</b></div>
-        <div class="projectionBox"><small>Compromissos abertos</small><b id="projOpen" class="red">R$ 0</b></div>
-        <div class="projectionBox"><small>Saldo projetado</small><b id="projSafe">R$ 0</b></div>
-        <div class="projectionBox"><small>Com jobs a receber</small><b id="projWithJobs" class="blue">R$ 0</b></div>
-      </div>
-      <div class="projectionNote" id="projNote">A projeção considera contas e faturas ainda abertas do mês selecionado.</div>
+    <div class="mini">
+      <span>COMPROMETIDO</span>
+      <strong id="totOut" class="red">R$ 0</strong>
     </div>
+
+    <div class="mini">
+      <span>A RECEBER</span>
+      <strong id="saldoHero" class="blue">R$ 0</strong>
+    </div>
+  </div>
+
+  <div class="homeStatus" id="homeStatus">
+    Calculando sua situação financeira...
+  </div>
+</div>
+
+<div class="card canSpendCard">
+  <div class="canSpendTop">
+    <div>
+      <div class="cardTitle">Quanto posso gastar?</div>
+      <div class="sub">Sem comprometer suas contas deste mês</div>
+    </div>
+
+    <span class="safeBadge">SEGURO</span>
+  </div>
+
+  <div id="canSpend" class="canSpendValue">R$ 0,00</div>
+
+  <div id="canSpendDaily" class="canSpendDaily">
+    Calculando limite diário...
+  </div>
+
+  <button class="simulateBtn" onclick="simulatePurchase()">
+    SIMULAR UMA COMPRA
+  </button>
+</div>
+
+<div class="card">
+  <div class="cardTitle">Previsão até o fim do mês</div>
+
+  <div class="projectionGrid">
+    <div class="projectionBox">
+      <small>Saldo atual</small>
+      <b id="projNow">R$ 0</b>
+    </div>
+
+    <div class="projectionBox">
+      <small>Jobs a receber</small>
+      <b id="projOpen" class="blue">R$ 0</b>
+    </div>
+
+    <div class="projectionBox">
+      <small>Saldo garantido</small>
+      <b id="projSafe">R$ 0</b>
+    </div>
+
+    <div class="projectionBox">
+      <small>Fim do mês</small>
+      <b id="projWithJobs">R$ 0</b>
+    </div>
+  </div>
+
+  <div class="projectionNote" id="projNote">
+    Calculando contas, cartão e recebimentos...
+  </div>
+</div>
 
     <div class="card homeInsightCard">
       <div class="cardTitle">Resumo inteligente</div>
