@@ -2452,23 +2452,36 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 </div>
 
 <div class="card canSpendCard" id="canSpendCard">
+
   <div class="canSpendTop">
     <div>
       <div class="cardTitle">Quanto posso gastar?</div>
-      <div class="sub">Sem comprometer suas contas deste mês</div>
+
+      <div class="sub">
+        Sem comprometer suas contas deste mês
+      </div>
     </div>
 
-  <span class="canSpendBadge" id="canSpendBadge">SEGURO</span>
+    <span class="canSpendBadge" id="canSpendBadge">
+      SEGURO
+    </span>
+  </div>
 
-  <div id="canSpend" class="canSpendValue">R$ 0,00</div>
+  <div id="canSpend" class="canSpendValue">
+    R$ 0,00
+  </div>
 
   <div id="canSpendDaily" class="canSpendDaily">
     Calculando limite diário...
   </div>
 
-  <button class="simulateBtn" onclick="simulatePurchase()">
+  <button
+    class="simulateBtn"
+    type="button"
+    onclick="simulatePurchase()">
     SIMULAR UMA COMPRA
   </button>
+
 </div>
 
 <div class="card">
