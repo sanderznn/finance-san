@@ -2521,6 +2521,21 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   line-height: 1.3;
 }
 
+#dividas #debtHero .miniGrid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+#dividas #debtHero .miniGrid > .mini {
+  width: auto !important;
+  min-width: 0;
+}
+
+#dividas #debtHero .mini span {
+  letter-spacing: 1px !important;
+}
+
 </style>
 
 </head>
@@ -2722,7 +2737,7 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </section>
 
   <section id="dividas" class="section">
-  <div class="title">Contas do mês</div>
+
     <div id="debtHero" class="hero homeHeroPro">
 
   <div class="homeTopLine">
