@@ -2421,6 +2421,23 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 
 </style>
 
+<style id="mini-cards-fix">
+
+  .bankMiniGrid{
+    grid-template-columns:.9fr 1.2fr .9fr !important;
+    gap:8px !important;
+  }
+
+  .bankMiniGrid .mini:nth-child(2) span{
+    display:block;
+    width:100%;
+    font-size:9px !important;
+    letter-spacing:1px !important;
+    white-space:nowrap;
+  }
+
+</style>
+
 </head>
 <body>
 <header>
