@@ -2438,6 +2438,46 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 
 </style>
 
+<style id="double-progress-style">
+
+  .progressMetric{
+    margin-top:18px;
+  }
+
+  .progressMetricTop{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:10px;
+  }
+
+  .progressMetricTop > span:first-child{
+    color:#f4f4f4;
+    font-size:14px;
+    font-weight:800;
+  }
+
+  .commitmentMetric{
+    margin-top:20px;
+    padding-top:18px;
+    border-top:1px solid rgba(255,255,255,.10);
+  }
+
+  #commitmentProgress{
+    width:0%;
+    height:100%;
+    border-radius:999px;
+    background:#ff5c6c;
+    transition:width .35s ease, background .35s ease;
+  }
+
+  .progressMetric .progressFooter{
+    margin-top:10px;
+  }
+
+</style>
+
 </head>
 <body>
 <header>
@@ -2573,17 +2613,59 @@ bottom:calc(22px + env(safe-area-inset-bottom));
       <div class="quote" id="dailyQuote">Carregando dica...</div>
     </div>
 
-    <div class="card homeProgressCard">
-      <div class="progressHeader">
-        <div>
-          <div class="cardTitle">Seu mês em cena</div>
-          <span class="sub">Relação entre o que entrou e o que saiu</span>
-        </div>
-        <span class="progressPill" id="pctText">0%</span>
-      </div>
-      <div class="progressBg"><div id="progress" class="progressFill" style="width:0%;background:#00f06a"></div></div>
-      <div class="progressFooter" id="progressFooter">Você ainda não registrou movimentos suficientes.</div>
+   <div class="card homeProgressCard">
+
+  <div class="progressHeader">
+    <div>
+      <div class="cardTitle">Seu mês em cena</div>
+
+      <span class="sub">
+        Visão real dos seus gastos e compromissos
+      </span>
     </div>
+  </div>
+
+  <div class="progressMetric">
+
+    <div class="progressMetricTop">
+      <span>Gastos já realizados</span>
+
+      <span class="progressPill" id="pctText">
+        0%
+      </span>
+    </div>
+
+    <div class="progressBg">
+      <div id="progress"></div>
+    </div>
+
+    <div class="progressFooter" id="progressFooter">
+      Calculando gastos realizados...
+    </div>
+
+  </div>
+
+  <div class="progressMetric commitmentMetric">
+
+    <div class="progressMetricTop">
+      <span>Total comprometido</span>
+
+      <span class="progressPill" id="commitmentPctText">
+        0%
+      </span>
+    </div>
+
+    <div class="progressBg">
+      <div id="commitmentProgress"></div>
+    </div>
+
+    <div class="progressFooter" id="commitmentFooter">
+      Calculando contas futuras...
+    </div>
+
+  </div>
+
+</div>
 
     <div class="lastHeader">
       <div class="title">Últimos lançamentos</div>
@@ -4522,6 +4604,64 @@ if(typeof progressFooter!=='undefined'){
       : pct<85
         ? 'Atenção: seus gastos já consumiram boa parte das entradas.'
         : 'Cuidado: o mês está pesado. Revise gastos e parcelas.';
+}
+
+const totalCommitted=
+  Number(t.saida||0)+Number(proj.open||0);
+
+const commitmentPct=Math.max(
+  0,
+  Math.round((totalCommitted/baseEntrada)*100)
+);
+
+const commitmentWidth=Math.min(100,commitmentPct);
+
+const commitmentPctTextEl=
+  document.getElementById('commitmentPctText');
+
+const commitmentProgressEl=
+  document.getElementById('commitmentProgress');
+
+const commitmentFooterEl=
+  document.getElementById('commitmentFooter');
+
+if(commitmentPctTextEl){
+  commitmentPctTextEl.textContent=commitmentPct+'%';
+
+  commitmentPctTextEl.style.color=
+    commitmentPct<70
+      ? '#00f06a'
+      : commitmentPct<100
+        ? '#f5c84b'
+        : '#ff5c6c';
+}
+
+if(commitmentProgressEl){
+  commitmentProgressEl.style.width=
+    commitmentWidth+'%';
+
+  commitmentProgressEl.style.background=
+    commitmentPct<70
+      ? '#00f06a'
+      : commitmentPct<100
+        ? '#f5c84b'
+        : '#ff5c6c';
+}
+
+if(commitmentFooterEl){
+
+  if(commitmentPct<70){
+    commitmentFooterEl.textContent=
+      'Mesmo considerando as contas futuras, seu mês ainda possui uma boa margem.';
+
+  }else if(commitmentPct<100){
+    commitmentFooterEl.textContent=
+      `Contas e gastos já comprometem ${commitmentPct}% das entradas deste mês.`;
+
+  }else{
+    commitmentFooterEl.textContent=
+      `Atenção: gastos e contas futuras ultrapassam suas entradas em ${commitmentPct-100}%.`;
+  }
 }
 
 if(typeof homeStatus!=='undefined'){
