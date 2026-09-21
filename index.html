@@ -2321,6 +2321,69 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 
 </style>
 
+<style id="home-finance-upgrade">
+.canSpendCard{
+  position:relative;
+  overflow:hidden;
+  border-color:rgba(53,244,119,.18)!important;
+  background:
+    radial-gradient(circle at 100% 0%,rgba(53,244,119,.12),transparent 45%),
+    rgba(255,255,255,.045)!important;
+}
+
+.canSpendTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.safeBadge{
+  background:rgba(53,244,119,.12);
+  border:1px solid rgba(53,244,119,.25);
+  color:#35f477;
+  border-radius:999px;
+  padding:7px 9px;
+  font-family:'Space Mono',monospace;
+  font-size:.55rem;
+  letter-spacing:1.2px;
+  font-weight:900;
+}
+
+.canSpendValue{
+  margin-top:17px;
+  color:#35f477;
+  font-size:2.25rem;
+  line-height:1;
+  font-weight:1000;
+  letter-spacing:-2px;
+}
+
+.canSpendDaily{
+  color:#aaaab3;
+  font-size:.76rem;
+  line-height:1.4;
+  margin-top:10px;
+}
+
+.simulateBtn{
+  width:100%;
+  margin-top:16px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:17px;
+  padding:13px;
+  background:#fff;
+  color:#050505;
+  font-weight:1000;
+  letter-spacing:.7px;
+}
+
+.simulateBtn:active{
+  transform:scale(.98);
+  opacity:.88;
+}
+</style>
+
 </head>
 <body>
 <header>
@@ -4195,6 +4258,94 @@ function exportCalendarICS(){
   setTimeout(()=>URL.revokeObjectURL(url),800);
 }
 
+function daysLeftInMonth(month=selectedMonth){
+  const [year,numberMonth]=month.split('-').map(Number);
+  const lastDay=new Date(year,numberMonth,0).getDate();
+
+  if(month===nowMonth()){
+    return Math.max(1,lastDay-new Date().getDate()+1);
+  }
+
+  return lastDay;
+}
+
+function buildHomeInsight(proj){
+  if(proj.safe<0 && proj.withJobs<0){
+    return `Mesmo recebendo todos os jobs, ainda faltarão ${fmt(Math.abs(proj.withJobs))}. Um novo job desse valor já faria o mês fechar no positivo.`;
+  }
+
+  if(proj.safe<0 && proj.withJobs>=0){
+    return `Hoje faltam ${fmt(Math.abs(proj.safe))} para cobrir tudo. Seus jobs podem resolver essa diferença, mas esse dinheiro ainda não está na conta.`;
+  }
+
+  if(proj.pendingJobs>0){
+    return `Suas contas estão cobertas. Você possui ${fmt(proj.safe)} livres e pode terminar o mês com ${fmt(proj.withJobs)} após receber os jobs.`;
+  }
+
+  if(proj.safe>0){
+    return `Todas as contas estão cobertas. Você pode usar até ${fmt(proj.safe)} sem deixar o mês negativo.`;
+  }
+
+  return 'Seu dinheiro atual está totalmente reservado para os compromissos do mês.';
+}
+
+function simulatePurchase(){
+  const item=prompt('O que você está pensando em comprar?');
+
+  if(item===null) return;
+
+  const rawValue=prompt('Qual é o valor da compra?');
+
+  if(rawValue===null) return;
+
+  let valueText=String(rawValue).trim();
+
+  if(valueText.includes(',') && valueText.includes('.')){
+    valueText=valueText.replace(/\./g,'').replace(',','.');
+  }else{
+    valueText=valueText.replace(',','.');
+  }
+
+  const value=Number(valueText);
+
+  if(!value || value<=0){
+    alert('Digite um valor válido.');
+    return;
+  }
+
+  const proj=projectionForMonth(selectedMonth);
+  const guaranteedAfter=proj.safe-value;
+  const expectedAfter=proj.withJobs-value;
+
+  if(guaranteedAfter>=0){
+    alert(
+      `${item}\n\n`+
+      `Compra: ${fmt(value)}\n`+
+      `Saldo livre depois: ${fmt(guaranteedAfter)}\n\n`+
+      `Você consegue comprar sem comprometer as contas.`
+    );
+    return;
+  }
+
+  if(expectedAfter>=0){
+    alert(
+      `${item}\n\n`+
+      `Compra: ${fmt(value)}\n`+
+      `Saldo garantido: ${fmt(guaranteedAfter)}\n`+
+      `Com os jobs recebidos: ${fmt(expectedAfter)}\n\n`+
+      `Só cabe no orçamento se os jobs forem pagos.`
+    );
+    return;
+  }
+
+  alert(
+    `${item}\n\n`+
+    `Compra: ${fmt(value)}\n`+
+    `Fim do mês: ${fmt(expectedAfter)}\n\n`+
+    `Essa compra deixaria o mês negativo em ${fmt(Math.abs(expectedAfter))}.`
+  );
+}
+
 function render(){
   updateMovMonthInfo();
   if(!data.creditCards) data.creditCards=[]; if(!data.creditPurchases) data.creditPurchases=[];
@@ -4203,13 +4354,34 @@ function render(){
   const t=totals(selectedMonth);
   const proj=projectionForMonth(selectedMonth);
   if(typeof projNow!=='undefined'){
-    projNow.textContent=fmt(proj.now);
-    projOpen.textContent=fmt(proj.open);
-    projSafe.textContent=fmt(proj.safe);
-    projWithJobs.textContent=fmt(proj.withJobs);
-    projSafe.className=proj.safe>=0?'green':'red';
-    projNote.textContent=`Contas abertas: ${fmt(proj.openDebt)} • faturas abertas: ${fmt(proj.openCard)} • jobs a receber: ${fmt(proj.pendingJobs)}.`;
+  projNow.textContent=fmt(proj.now);
+  projOpen.textContent=fmt(proj.pendingJobs);
+  projSafe.textContent=fmt(proj.safe);
+  projWithJobs.textContent=fmt(proj.withJobs);
+
+  projSafe.className=proj.safe>=0?'green':'red';
+  projWithJobs.className=proj.withJobs>=0?'green':'red';
+
+  projNote.textContent=
+    `Saldo atual ${fmt(proj.now)} − contas ${fmt(proj.openDebt)} `+
+    `− cartão ${fmt(proj.openCard)} + jobs ${fmt(proj.pendingJobs)}.`;
+
+  const spendable=Math.max(0,proj.safe);
+  const days=daysLeftInMonth(selectedMonth);
+
+  const canSpendEl=document.getElementById('canSpend');
+  const canSpendDailyEl=document.getElementById('canSpendDaily');
+
+  if(canSpendEl){
+    canSpendEl.textContent=fmt(spendable);
   }
+
+  if(canSpendDailyEl){
+    canSpendDailyEl.textContent=spendable>0
+      ? `${fmt(spendable/days)} por dia até o fim do mês.`
+      : 'Seu dinheiro atual já está comprometido.';
+  }
+}
 
   if(typeof quickDebtMonth!=='undefined'){
     const debtMonth=currentMonthDebtTotal(selectedMonth);
@@ -4219,17 +4391,48 @@ function render(){
     quickDebtOpen.textContent=fmt(Math.max(0,debtMonth-debtPaid));
   }
 
-  saldo.textContent=fmt(t.saldo); saldo.className='bigMoney '+(t.saldo>500?'ok':t.saldo>200?'warn':'bad');
-  totIn.textContent=fmt(t.entrada); totOut.textContent=fmt(t.saida); if(typeof saldoHero!=='undefined') saldoHero.textContent=fmt(t.totalDividas||0);
-  const baseEntrada=Math.max(1,t.entrada||data.salario||1);
-  const pct=Math.min(100,Math.round((t.saida/baseEntrada)*100));
-  const sobraPct=Math.max(0,Math.round((t.saldo/baseEntrada)*100));
-  pctText.textContent=pct+'%';
-  progress.style.width=pct+'%'; progress.style.background=pct<60?'#00f06a':pct<85?'#f5c84b':'#ff4d5e';
-  if(typeof progressFooter!=='undefined') progressFooter.textContent=pct<60?'Seu mês está saudável. Você está gastando menos do que entrou.':pct<85?'Atenção: seus gastos já consumiram boa parte das entradas.':'Cuidado: o mês está pesado. Revise gastos e parcelas.';
-  if(typeof homeStatus!=='undefined') homeStatus.textContent=t.saldo>=0?`Você está positivo este mês. Sobrou ${fmt(t.saldo)} até agora (${sobraPct}% das entradas).`:`Você está negativo este mês em ${fmt(Math.abs(t.saldo))}.`;
-  const dicas=['Controle não é prisão. É direção.','Seu dinheiro precisa trabalhar para sua liberdade.','Uma parcela marcada como paga é um passo a menos na dívida.','Todo freela precisa virar parte da sua organização.','Antes de comprar, pergunta: isso aproxima ou afasta da minha meta?'];
-  dailyQuote.textContent=dicas[Math.floor(Math.random()*dicas.length)];
+  saldo.textContent=fmt(proj.safe);
+
+saldo.className='bigMoney '+
+  (proj.safe>500?'ok':proj.safe>=0?'warn':'bad');
+
+totIn.textContent=fmt(proj.now);
+totOut.textContent=fmt(proj.open);
+
+if(typeof saldoHero!=='undefined'){
+  saldoHero.textContent=fmt(proj.pendingJobs);
+}
+
+const baseEntrada=Math.max(1,t.entrada||data.salario||1);
+const pct=Math.min(100,Math.round((t.saida/baseEntrada)*100));
+
+pctText.textContent=pct+'%';
+progress.style.width=pct+'%';
+
+progress.style.background=
+  pct<60?'#00f06a':
+  pct<85?'#f5c84b':
+  '#ff4d5e';
+
+if(typeof progressFooter!=='undefined'){
+  progressFooter.textContent=
+    pct<60
+      ? 'Seu mês está saudável. Você está gastando menos do que entrou.'
+      : pct<85
+        ? 'Atenção: seus gastos já consumiram boa parte das entradas.'
+        : 'Cuidado: o mês está pesado. Revise gastos e parcelas.';
+}
+
+if(typeof homeStatus!=='undefined'){
+  homeStatus.textContent=proj.safe>=0
+    ? `Depois de reservar todas as contas, você possui ${fmt(proj.safe)} realmente livres.`
+    : `Seu saldo atual não cobre ${fmt(Math.abs(proj.safe))} dos compromissos deste mês.`;
+}
+
+if(typeof dailyQuote!=='undefined'){
+  dailyQuote.textContent=buildHomeInsight(proj);
+}
+
   lastList.innerHTML=movsInMonth(selectedMonth).map(m=>`<div class="item">
     <div class="itemLeft">
       <div class="icon">${String(m.cat||'🎯').split(' ')[0]}</div>
