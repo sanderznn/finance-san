@@ -2464,13 +2464,17 @@ bottom:calc(22px + env(safe-area-inset-bottom));
     border-top:1px solid rgba(255,255,255,.10);
   }
 
-  #commitmentProgress{
-    width:0%;
-    height:100%;
-    border-radius:999px;
-    background:#ff5c6c;
-    transition:width .35s ease, background .35s ease;
-  }
+#progress,
+#commitmentProgress{
+  width:0%;
+  height:100%;
+  border-radius:999px;
+  transition:width .35s ease, background .35s ease;
+}
+
+#commitmentProgress{
+  background:#ff5c6c;
+}
 
   .progressMetric .progressFooter{
     margin-top:10px;
