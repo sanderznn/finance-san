@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict');const {Finance:F}=require('./finance-core.js');
+const base=()=>({movs:[],debts:[],jobs:[],wishes:[],creditCards:[],creditPurchases:[],creditInvoicePayments:[]});
+let d=base();d.movs=[{tipo:'entrada',valor:500,ym:'2026-09'}];assert.equal(F.totals(d,'2026-10').saldo,500);
+d=base();d.jobs=[{valor:500,status:'Pago',dataEvento:'2026-10-15',paidMonth:'2026-11'}];assert.equal(F.totals(d,'2026-10').saldo,0);assert.equal(F.totals(d,'2026-11').saldo,500);
+d=base();d.creditCards=[{id:'c',vencimento:6}];d.creditPurchases=[{cardId:'c',valor:100,parcelas:3,inicio:'2026-10'}];assert.equal(F.used(d,'c'),100);assert.equal(F.invoice(d,'c','2026-10'),33.34);assert.equal(F.invoice(d,'c','2026-11'),33.33);assert.equal(F.invoice(d,'c','2026-12'),33.33);
+d.creditInvoicePayments=[{cardId:'c',ym:'2026-10',valor:33.34}];assert.equal(F.used(d,'c'),66.66);d.creditPurchases.push({cardId:'c',valor:50,parcelas:1,inicio:'2026-10'});assert.equal(F.invoiceOpen(d,'c','2026-10'),50);assert.equal(F.obligations(d,'2026-11').filter(r=>r.month==='2026-10')[0].value,50);
+d=base();d.debts=[{id:'x',nome:'Conta',valor:100,meses:1,inicio:'2026-10',pagos:[0],paymentRecords:{0:{date:'2026-11-01',value:100}}}];assert.equal(F.totals(d,'2026-10').saida,0);assert.equal(F.totals(d,'2026-11').saida,100);
+assert.equal(F.add('2026-01',-1),'2025-12');
+d=base();d.debts=[{id:'f',fixa:true,inicio:'2026-09',valor:70,paidMonths:[],dia:1}];assert.equal(F.obligations(d,'2026-11').length,3);
+console.log('PASS: carryover, receipt dates, cent rounding, unpaid limits, invoice differences, arrears, debt payment dates, year boundary');

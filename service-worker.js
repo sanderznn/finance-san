@@ -1,19 +1,12 @@
-const CACHE_NAME='san-finance-alpha3-planning-business-v1';
-const FILES=["./", "./index.html", "./manifest.webmanifest", "./icon-72.png", "./icon-96.png", "./icon-128.png", "./icon-144.png", "./icon-152.png", "./icon-180.png", "./icon-192.png", "./icon-384.png", "./icon-512.png", "./icon-maskable-512.png", "./splash-1170x2532.png", "./splash-1284x2778.png", "./splash-1125x2436.png", "./splash-828x1792.png", "./splash-1242x2688.png"];
-self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(FILES)));
-  self.skipWaiting();
-});
-self.addEventListener('activate',event=>{
-  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE_NAME).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));
-});
+const CACHE_NAME='san-finance-v7-20261021';
+const FILES=['./','./index.html','./finance-core.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));});
+self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('san-finance-')&&k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',event=>{
-  if(event.request.method!=='GET') return;
-  event.respondWith(
-    fetch(event.request).then(response=>{
-      const copy=response.clone();
-      caches.open(CACHE_NAME).then(cache=>cache.put(event.request,copy)).catch(()=>{});
-      return response;
-    }).catch(()=>caches.match(event.request).then(cached=>cached||caches.match('./index.html')))
-  );
+ if(event.request.method!=='GET'||new URL(event.request.url).origin!==self.location.origin)return;
+ event.respondWith((async()=>{
+  const cache=await caches.open(CACHE_NAME);
+  try{const response=await fetch(event.request);if(response.ok)await cache.put(event.request,response.clone());return response;}
+  catch(error){const cached=await cache.match(event.request,{ignoreSearch:event.request.mode==='navigate'});if(cached)return cached;if(event.request.mode==='navigate')return (await cache.match('./index.html'))||Response.error();return Response.error();}
+ })());
 });

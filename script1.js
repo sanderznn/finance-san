@@ -9,11 +9,15 @@ const defaultData={
   creditPurchases:[],
   creditInvoicePayments:[]
 };
+let storageBlocked=false;
 let data=load();
 data=repairData(data);
+try{const original=localStorage.getItem(KEY);if(original&&!localStorage.getItem(KEY+'_beforeV7'))localStorage.setItem(KEY+'_beforeV7',original);}catch(e){}
 save();
 let tipo='gasto';
-let selectedMonth=localStorage.getItem(KEY+'_selectedMonth')||nowMonth();
+let selectedMonth=nowMonth();
+try{const savedMonth=localStorage.getItem(KEY+'_selectedMonth');if(validMonth(savedMonth))selectedMonth=savedMonth;}catch(e){}
+function rememberMonth(){try{localStorage.setItem(KEY+'_selectedMonth',selectedMonth)}catch(e){}}
 function uid(){
   if(window.crypto && typeof window.crypto.randomUUID==='function') return window.crypto.randomUUID();
   return 'id_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
@@ -50,23 +54,83 @@ function repairData(d){
   });
   return Object.assign({}, defaultData, d);
 }
-function load(){try{return repairData(JSON.parse(localStorage.getItem(KEY))||defaultData)}catch{return repairData(defaultData)}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function load(){
+ try{const raw=localStorage.getItem(KEY);if(raw===null)return repairData(JSON.parse(JSON.stringify(defaultData)));return repairData(validateBackup(JSON.parse(raw)));}
+ catch(e){storageBlocked=true;setTimeout(()=>alert('Os dados locais não puderam ser lidos. Eles foram preservados. Use Configurações para baixar os dados originais e restaurar um backup.'),0);return repairData(JSON.parse(JSON.stringify(defaultData)));}
+}
+function save(){
+ if(storageBlocked){alert('Gravação bloqueada para proteger seus dados. Exporte uma cópia e restaure um backup válido em Configurações.');return false;}
+ try{const old=localStorage.getItem(KEY);if(old)localStorage.setItem(KEY+'_previous',old);localStorage.setItem(KEY,JSON.stringify(data));return true;}
+ catch(e){storageBlocked=true;alert('Não foi possível salvar. Exporte um backup agora; não feche o app antes disso.');return false;}
+}
 function fmt(v){return 'R$ '+Number(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
-function nowMonth(){return new Date().toISOString().slice(0,7)}
+function nowMonth(){return Finance.localDate().slice(0,7)}
 function monthName(m){let [y,mo]=m.split('-');return new Date(Number(y),Number(mo)-1,1).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).replace('.','')}
 function monthLabelSmart(m){return monthName(m).toUpperCase()}
 function normalizeYM(v){return /^\d{4}-\d{2}$/.test(v||'')?v:nowMonth()}
-function setSelectedMonth(v){selectedMonth=normalizeYM(v);localStorage.setItem(KEY+'_selectedMonth',selectedMonth);closeMonthPicker();render()}
-function changeMonth(delta){selectedMonth=addMonths(selectedMonth,delta);localStorage.setItem(KEY+'_selectedMonth',selectedMonth);render();syncMonthPicker()}
-function goCurrentMonth(){selectedMonth=nowMonth();localStorage.setItem(KEY+'_selectedMonth',selectedMonth);render();syncMonthPicker()}
+function setSelectedMonth(v){selectedMonth=normalizeYM(v);rememberMonth();closeMonthPicker();render()}
+function changeMonth(delta){selectedMonth=addMonths(selectedMonth,delta);rememberMonth();render();syncMonthPicker()}
+function goCurrentMonth(){selectedMonth=nowMonth();rememberMonth();render();syncMonthPicker()}
 function openMonthPicker(){syncMonthPicker();const o=document.getElementById('monthOverlay');if(o)o.classList.add('open')}
 function closeMonthPicker(ev){if(ev&&ev.target&&ev.target.id!=='monthOverlay')return;const o=document.getElementById('monthOverlay');if(o)o.classList.remove('open')}
 function syncMonthPicker(){const i=document.getElementById('smartMonthInput');if(i)i.value=selectedMonth;const t=document.getElementById('monthSheetTitle');if(t)t.textContent=monthName(selectedMonth)}
 function movMonth(m){if(m.ym)return m.ym; const d=String(m.date||''); const parts=d.split('/'); if(parts.length===3)return parts[2]+'-'+parts[1].padStart(2,'0'); return nowMonth()}
 function movsInMonth(month=selectedMonth){return (data.movs||[]).filter(m=>movMonth(m)===month)}
 function jobsInMonth(month=selectedMonth){return (data.jobs||[]).filter(j=>!j.dataEvento || String(j.dataEvento).slice(0,7)===month)}
-function show(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');closeFab();render();updateFab()}
+function show(id,btn){
+
+  document
+    .querySelectorAll('.section')
+    .forEach(s=>s.classList.remove('active'));
+
+  const section=document.getElementById(id);
+
+  if(section){
+    section.classList.add('active');
+  }
+
+  document
+    .querySelectorAll('.tab')
+    .forEach(t=>t.classList.remove('active'));
+
+  if(btn){
+    btn.classList.add('active');
+  }
+
+  closeFab();
+  render();
+  updateFab();
+}
+function openNavMenu(){
+
+  const menu=document.getElementById('navMenuOverlay');
+
+  if(menu){
+    menu.classList.add('open');
+  }
+
+  document.body.style.overflow='hidden';
+}
+
+
+function closeNavMenu(){
+
+  const menu=document.getElementById('navMenuOverlay');
+
+  if(menu){
+    menu.classList.remove('open');
+  }
+
+  document.body.style.overflow='';
+}
+
+
+function goFromMenu(id){
+
+  closeNavMenu();
+
+  show(id,null);
+}
 function setTipo(t){tipo=t;tabGasto.className='pill'+(t==='gasto'?' activeG':'');tabEntrada.className='pill'+(t==='entrada'?' activeE':'');movCat.style.display=t==='entrada'?'none':''}
 
 function debtAppliesInMonth(d, month){
@@ -109,25 +173,156 @@ function currentMonthDebtPaid(month=nowMonth()){
   },0);
 }
 
-function totals(month=selectedMonth){
-  const movs=movsInMonth(month);
-  const entrada=movs.filter(m=>m.tipo==='entrada').reduce((a,b)=>a+b.valor,0);
-  const gastos=movs.filter(m=>m.tipo==='gasto').reduce((a,b)=>a+b.valor,0);
-  const dividasMes=currentMonthDebtTotal(month);
-  const dividasPagas=currentMonthDebtPaid(month);
-  const jobsPagos=jobsInMonth(month).filter(j=>isJobPaid(j)).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
-  const saldo=entrada+jobsPagos-gastos-dividasPagas;
-  return{entrada:entrada+jobsPagos,entradasExtras:entrada,gastos,dividasPagas,totalDividas:dividasMes,saldo,saida:gastos+dividasPagas,jobsPagos}
-}
+function totals(month=selectedMonth){return {...Finance.totals(data,month),totalDividas:currentMonthDebtTotal(month)}}
 
 function addMov(){
   const nome=movNome.value.trim(), valor=parseFloat(movValor.value);
-  if(!nome||!valor){alert('Preenche nome e valor.');return false}
+  if(!nome||!Number.isFinite(valor)||valor<=0){alert('Preenche nome e valor.');return false}
   if(valor>50000 && !confirm('Valor muito alto. Confirmar lançamento?')) return false;
-  data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:nowMonth(),date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
+  data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:selectedMonth,date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
   movNome.value='';movValor.value='';save();render();return true
 }
-function delMov(id){
+let editingMovId = null;
+let editingMovTipo = 'gasto';
+
+function setEditTipo(t){
+  editingMovTipo = t;
+
+  const gasto = document.getElementById('editTabGasto');
+  const entrada = document.getElementById('editTabEntrada');
+  const categoria = document.getElementById('editMovCat');
+
+  if(gasto){
+    gasto.className = 'pill' + (t === 'gasto' ? ' activeG' : '');
+  }
+
+  if(entrada){
+    entrada.className = 'pill' + (t === 'entrada' ? ' activeE' : '');
+  }
+
+  if(categoria){
+    categoria.style.display = t === 'entrada' ? 'none' : '';
+  }
+}
+
+function editMov(id){
+
+  const m = (data.movs || []).find(x => x.id === id);
+
+  if(!m){
+    alert('Lançamento não encontrado.');
+    return;
+  }
+
+  const linkedCard = (data.creditInvoicePayments || [])
+    .some(p => p.movId === id);
+
+  const linkedJob = (data.jobs || [])
+    .some(j =>
+      (j.costs || []).some(c => c.movId === id)
+    );
+
+  if(linkedCard || linkedJob){
+    alert(
+      'Esse lançamento está vinculado a outro registro. ' +
+      'Edite pela área de origem.'
+    );
+    return;
+  }
+
+  editingMovId = id;
+
+  document.getElementById('editMovNome').value = m.nome || '';
+  document.getElementById('editMovValor').value = m.valor || '';
+  document.getElementById('editMovMes').value =
+    m.ym || selectedMonth;
+
+  setEditTipo(m.tipo || 'gasto');
+
+  const cat = document.getElementById('editMovCat');
+
+  if(cat && m.tipo !== 'entrada'){
+    const existe = [...cat.options]
+      .some(option => option.value === m.cat);
+
+    cat.value = existe ? m.cat : '🎯 Outros';
+  }
+
+  const modal = document.getElementById('editMovModal');
+
+  if(modal){
+    modal.classList.add('open');
+  }
+}
+
+function closeEditMovModal(){
+
+  const modal = document.getElementById('editMovModal');
+
+  if(modal){
+    modal.classList.remove('open');
+  }
+
+  editingMovId = null;
+}
+
+function saveEditMov(){
+
+  if(!editingMovId){
+    alert('Nenhum lançamento selecionado.');
+    return;
+  }
+
+  const m = (data.movs || [])
+    .find(x => x.id === editingMovId);
+
+  if(!m){
+    alert('Lançamento não encontrado.');
+    return;
+  }
+
+  const nome =
+    document.getElementById('editMovNome').value.trim();
+
+  const valor =
+    parseFloat(document.getElementById('editMovValor').value);
+
+  const mes =
+    document.getElementById('editMovMes').value;
+
+  if(!nome){
+    alert('Digite o nome do lançamento.');
+    return;
+  }
+
+  if(!valor || valor <= 0){
+    alert('Digite um valor válido.');
+    return;
+  }
+
+  if(!/^\d{4}-\d{2}$/.test(mes)){
+    alert('Escolha um mês válido.');
+    return;
+  }
+
+  m.nome = nome;
+  m.valor = valor;
+  m.tipo = editingMovTipo;
+  m.ym = mes;
+
+  if(editingMovTipo === 'entrada'){
+    m.cat = '💰';
+  }else{
+    m.cat =
+      document.getElementById('editMovCat').value;
+  }
+
+  save();
+  render();
+  closeEditMovModal();
+}
+
+  function delMov(id){
   if(!confirm('Apagar este lançamento?')) return;
   data.movs=(data.movs||[]).filter(m=>m.id!==id);
   data.creditInvoicePayments=(data.creditInvoicePayments||[]).filter(p=>p.movId!==id);
@@ -151,30 +346,23 @@ function addDebt(){
   const meses=fixa ? 1 : parseInt(debtMeses.value);
   let dia=parseInt(debtDia.value);
   if(!dia || dia < 1 || dia > 31) dia=10;
-  if(!nome||!valor||(!fixa&&!meses)){alert('Preenche nome, valor e meses.');return}
+  if(!nome||!Number.isFinite(valor)||valor<=0||(!fixa&&(!Number.isInteger(meses)||meses<1||meses>600))){alert('Preenche nome, valor e meses.');return}
   data.debts.unshift({id:uid(),nome,valor,meses,fixa,inicio,dia,pagos:[],paidMonths:[]});
   debtNome.value='';debtValor.value='';debtMeses.value='';debtInicio.value='';debtDia.value='';
   const fc=document.getElementById('formDebtCard'); if(fc) fc.classList.remove('open');
   if(typeof debtTipo !== 'undefined'){debtTipo.value='parcelada'; toggleDebtType();}
   save();render()
 }
-function toggleDebt(id,idx){
-  const d=data.debts.find(x=>x.id===id);
-  if(!d)return;
-  if(d.fixa){
-    if(!Array.isArray(d.paidMonths)) d.paidMonths=[];
-    const month=selectedMonth||nowMonth();
-    if(d.paidMonths.includes(month)) d.paidMonths=d.paidMonths.filter(m=>m!==month);
-    else d.paidMonths.push(month);
-    d.paidMonths.sort();
-    save();render();return;
-  }
-  if(!Array.isArray(d.pagos)) d.pagos=[];
-  if(d.pagos.includes(idx)) d.pagos=d.pagos.filter(p=>p!==idx); else d.pagos.push(idx);
-  d.pagos.sort((a,b)=>a-b); save(); render();
+function toggleDebt(id,idx,month=selectedMonth){
+ const d=data.debts.find(x=>x.id===id);if(!d)return;
+ const key=d.fixa?month:String(idx),list=d.fixa?(d.paidMonths||(d.paidMonths=[])):(d.pagos||(d.pagos=[])),entry=d.fixa?month:idx;
+ d.paymentRecords=d.paymentRecords||{};
+ if(list.includes(entry)){if(!confirm('Desmarcar este pagamento?'))return;list.splice(list.indexOf(entry),1);delete d.paymentRecords[key];}
+ else{const date=prompt('Data do pagamento (AAAA-MM-DD)',Finance.localDate());if(date===null)return;if(!validDate(date)){alert('Data inválida.');return;}list.push(entry);d.paymentRecords[key]={date,value:d.valor};}
+ save();render();
 }
-function delDebt(id){if(confirm('Apagar essa dívida?')){data.debts=data.debts.filter(d=>d.id!==id);save();render()}}
-function addMonths(ym,n){let [y,m]=ym.split('-').map(Number);m+=n; y+=Math.floor((m-1)/12); m=((m-1)%12)+1; return y+'-'+String(m).padStart(2,'0')}
+function delDebt(id){const d=data.debts.find(x=>x.id===id);if(d&&((d.pagos||[]).length||(d.paidMonths||[]).length)){alert('Esta conta possui pagamentos. Desmarque-os antes de apagar para preservar o histórico.');return;}if(confirm('Apagar essa dívida?')){data.debts=data.debts.filter(d=>d.id!==id);save();render()}}
+function addMonths(ym,n){return Finance.add(ym,n)}
 let savingJob=false;
 function addJob(){
   if(savingJob) return;
@@ -182,7 +370,7 @@ function addJob(){
   setTimeout(()=>{savingJob=false},800);
   const cliente=jobCliente.value.trim(), valor=parseFloat(jobValor.value), status=jobStatus.value, obs=jobObs.value.trim();
   const dataEvento=jobDataEvento.value;
-  if(!cliente||!valor){alert('Preenche cliente e valor.');savingJob=false;return}
+  if(!cliente||!Number.isFinite(valor)||valor<=0){alert('Preenche cliente e valor.');savingJob=false;return}
   if(!dataEvento){alert('Coloque a data do evento.');savingJob=false;return}
   data.jobs=repairIds(data.jobs,'job');
   const newJob={id:uid(),cliente,valor,status:jobStatusLabel(status),obs,dataEvento,costs:[]};
@@ -191,7 +379,7 @@ function addJob(){
   // Quando o job é lançado para um mês futuro, o app muda para o mês do evento
   // para o cadastro aparecer imediatamente na lista de Jobs.
   selectedMonth=String(dataEvento).slice(0,7);
-  localStorage.setItem(KEY+'_selectedMonth',selectedMonth);
+  rememberMonth();
   jobCliente.value='';jobValor.value='';jobObs.value='';jobDataEvento.value='';
   const fc=document.getElementById('formJobCard'); if(fc) fc.classList.remove('open');
   save();render();savingJob=false
@@ -238,15 +426,15 @@ function updateJob(id,status){
   data.jobs=repairIds(data.jobs,'job');
   let j=data.jobs.find(x=>x.id===id);
   if(j){
-    const wasPaid=isJobPaid(j);
+    const wasPaid=isJobPaid(j);const previousStatus=j.status;
     j.status=status;
     const nowPaid=isJobPaid(j);
-    if(nowPaid&&!wasPaid){j.paidAt=new Date().toISOString();j.paidMonth=nowMonth();}
+    if(nowPaid&&!wasPaid){const date=prompt('Data do recebimento (AAAA-MM-DD)',Finance.localDate());if(!validDate(date)){j.status=previousStatus;return;}j.paidAt=date;j.paidMonth=date.slice(0,7);}
     if(!nowPaid&&wasPaid){delete j.paidAt;delete j.paidMonth;}
     save();render();
   }
 }
-function delJob(id){data.jobs=repairIds(data.jobs,'job');if(confirm('Apagar job?')){data.jobs=data.jobs.filter(j=>j.id!==id);save();render()}}
+function delJob(id){const j=data.jobs.find(x=>x.id===id);if(j&&(isJobPaid(j)||(j.costs||[]).length)){alert('Este job possui recebimento ou custos. Remova esses vínculos antes de apagar.');return;}data.jobs=repairIds(data.jobs,'job');if(confirm('Apagar job?')){data.jobs=data.jobs.filter(j=>j.id!==id);save();render()}}
 
 function jobCostTotal(j){
   return (j&&Array.isArray(j.costs)?j.costs:[]).reduce((sum,c)=>sum+(parseFloat(c.valor)||0),0);
@@ -287,12 +475,12 @@ function delJobCost(jobId,costId){
 }
 function addWish(){
   const nome=wishNome.value.trim(), valor=parseFloat(wishValor.value), guardado=parseFloat(wishGuardado.value||0);
-  if(!nome||!valor){alert('Preenche desejo e meta.');return}
+  if(!nome||!Number.isFinite(valor)||valor<=0||!Number.isFinite(guardado)||guardado<0){alert('Confira nome, meta e valor guardado.');return}
   data.wishes.unshift({id:uid(),nome,valor,guardado});
   wishNome.value='';wishValor.value='';wishGuardado.value='';const fc=document.getElementById('formWishCard'); if(fc) fc.classList.remove('open');save();render()
 }
 function addWishMoney(id){
-  const v=parseFloat(prompt('Quanto você vai adicionar nessa meta?')||0);
+  const v=parseFloat((prompt('Quanto você vai adicionar nessa meta?')||'0').replace(',','.'));
   if(v>0){let w=data.wishes.find(x=>x.id===id);w.guardado+=v;save();render()}
 }
 function delWish(id){if(confirm('Apagar desejo?')){data.wishes=data.wishes.filter(w=>w.id!==id);save();render()}}
@@ -308,7 +496,7 @@ function exportBackup(){
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  const date=new Date().toISOString().slice(0,10);
+  const date=Finance.localDate();
   a.href=url;
   a.download='san-finance-backup-'+date+'.json';
   document.body.appendChild(a);
@@ -318,33 +506,14 @@ function exportBackup(){
 }
 
 function importBackup(event){
-  const file=event.target.files && event.target.files[0];
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(){
-    try{
-      const parsed=JSON.parse(reader.result);
-      const imported=parsed.data || parsed;
-      if(!imported || typeof imported!=='object') throw new Error('Arquivo vazio');
-      if(!Array.isArray(imported.movs)) imported.movs=[];
-      if(!Array.isArray(imported.debts)) imported.debts=[];
-      if(!Array.isArray(imported.jobs)) imported.jobs=[];
-      if(!Array.isArray(imported.wishes)) imported.wishes=[];
-      if(!Array.isArray(imported.creditCards)) imported.creditCards=[];
-      if(!Array.isArray(imported.creditPurchases)) imported.creditPurchases=[];
-      if(!Array.isArray(imported.creditInvoicePayments)) imported.creditInvoicePayments=[];
-      if(confirm('Restaurar este backup? Isso vai substituir os dados atuais do app.')){
-        data=repairData(imported);
-        save();
-        render();
-        alert('Backup restaurado com sucesso.');
-      }
-    }catch(e){
-      alert('Não consegui importar esse arquivo. Verifique se é um backup válido do SAN Finance.');
-    }
-    event.target.value='';
-  };
-  reader.readAsText(file);
+ const file=event.target.files&&event.target.files[0];if(!file)return;
+ const reader=new FileReader();reader.onload=()=>{try{
+ const parsed=JSON.parse(reader.result),next=repairData(validateBackup(parsed.data||parsed));
+ if(!confirm('Substituir os dados atuais por este backup? Uma cópia local anterior será preservada.'))return;
+ const old=localStorage.getItem(KEY);if(old)localStorage.setItem(KEY+'_beforeImport',old);
+ localStorage.setItem(KEY,JSON.stringify(next));data=next;storageBlocked=false;render();alert('Backup restaurado.');
+ }catch(e){alert('Backup inválido ou armazenamento indisponível. Os dados anteriores foram preservados.');}finally{event.target.value='';}};
+ reader.onerror=()=>alert('Não foi possível ler o arquivo.');reader.readAsText(file);
 }
 
 function csvEscape(value){
@@ -363,7 +532,7 @@ function exportCSV(){
       m.cat||'',
       m.date||'',
       m.time||'',
-      '',
+      m.ym||movMonth(m),
       ''
     ]);
   });
@@ -373,7 +542,7 @@ function exportCSV(){
       d.fixa?'conta_fixa':'divida',
       d.nome||'',
       d.valor||0,
-      (d.pagos||[]).length + '/' + (d.meses||1) + ' pagos',
+      d.fixa?(d.paidMonths||[]).join(','):(d.pagos||[]).length + '/' + (d.meses||1) + ' pagos',
       d.inicio||'',
       'vencimento dia ' + (d.dia||10),
       'meses ' + (d.meses||1),
@@ -437,7 +606,7 @@ function exportCSV(){
   const blob=new Blob(["\ufeff"+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  const date=new Date().toISOString().slice(0,10);
+  const date=Finance.localDate();
   a.href=url;
   a.download='san-finance-dados-'+date+'.csv';
   document.body.appendChild(a);
@@ -452,6 +621,7 @@ function resetAll(){
   const second=confirm('Última confirmação: você já baixou um backup? Clique em OK para apagar tudo.');
   if(!second) return;
   localStorage.removeItem(KEY);
+  storageBlocked=false;
   data=JSON.parse(JSON.stringify(defaultData));
   save();
   render();
@@ -483,18 +653,7 @@ function editDebtDay(id){
   d.dia=novo; save(); render();
 }
 
-function creditMonthAmount(cardId, month){
-  return (data.creditPurchases||[])
-    .filter(p=>p.cardId===cardId)
-    .reduce((sum,p)=>{
-      const parcelas = parseInt(p.parcelas)||1;
-      const valorParcela = (parseFloat(p.valor)||0) / parcelas;
-      for(let i=0;i<parcelas;i++){
-        if(addMonths(p.inicio,i)===month) return sum + valorParcela;
-      }
-      return sum;
-    },0);
-}
+function creditMonthAmount(cardId,month){return Finance.invoice(data,cardId,month)}
 function creditTotalUsed(cardId){
   return (data.creditPurchases||[])
     .filter(p=>p.cardId===cardId)
@@ -505,54 +664,31 @@ function monthsBetween(a,b){
   const [by,bm]=String(b).split('-').map(Number);
   return (by-ay)*12+(bm-am);
 }
-function creditOutstanding(cardId, month=nowMonth()){
-  return (data.creditPurchases||[]).filter(p=>p.cardId===cardId).reduce((sum,p)=>{
-    const parcelas=Math.max(1,parseInt(p.parcelas)||1);
-    const valor=parseFloat(p.valor)||0;
-    const start=p.inicio||nowMonth();
-    const elapsed=monthsBetween(start,month);
-    const paidCount=Math.max(0,Math.min(parcelas,elapsed));
-    const remaining=Math.max(0,parcelas-paidCount);
-    return sum+(valor/parcelas)*remaining;
-  },0);
-}
+function creditOutstanding(cardId,month=nowMonth()){return Finance.used(data,cardId)}
 function invoicePayment(cardId,month){
   return (data.creditInvoicePayments||[]).find(p=>p.cardId===cardId && p.ym===month);
 }
-function invoiceIsPaid(cardId,month){return !!invoicePayment(cardId,month)}
+function invoiceIsPaid(cardId,month){return creditMonthAmount(cardId,month)>0 && Finance.invoiceOpen(data,cardId,month)===0}
 function payCreditInvoice(cardId,month=selectedMonth){
-  const card=(data.creditCards||[]).find(c=>c.id===cardId);
-  if(!card) return;
-  const invoice=creditMonthAmount(cardId,month);
-  if(invoice<=0){alert('Não há fatura para este mês.');return}
-  if(invoiceIsPaid(cardId,month)){alert('Essa fatura já está marcada como paga.');return}
-  if(!confirm(`Marcar a fatura ${card.nome} de ${fmt(invoice)} como paga e registrar como saída?`)) return;
-  const movId=uid();
-  const [y,m]=month.split('-').map(Number);
-  const last=new Date(y,m,0).getDate();
-  const day=Math.min(parseInt(card.vencimento)||10,last);
-  const date=String(day).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+y;
-  data.movs.unshift({
-    id:movId,tipo:'gasto',nome:'Fatura '+card.nome,valor:invoice,cat:'💳 Cartão',
-    ym:month,date,time:'',cardId,invoiceMonth:month
-  });
-  data.creditInvoicePayments.unshift({id:uid(),cardId,ym:month,valor:invoice,movId,paidAt:new Date().toISOString()});
-  save();render();
+ const card=data.creditCards.find(c=>c.id===cardId);if(!card)return;
+ const value=Finance.invoiceOpen(data,cardId,month);if(value<=0)return;
+ const date=prompt('Data do pagamento (AAAA-MM-DD)',Finance.localDate());if(date===null)return;
+ if(!validDate(date)){alert('Data inválida.');return;}
+ if(!confirm('Registrar pagamento de '+fmt(value)+'?'))return;
+ const movId=uid();data.movs.unshift({id:movId,tipo:'gasto',nome:'Fatura '+card.nome,valor:value,cat:'💳 Cartão',ym:date.slice(0,7),date:date.split('-').reverse().join('/'),cardId,invoiceMonth:month});
+ data.creditInvoicePayments.push({id:uid(),cardId,ym:month,valor:value,movId,paidAt:date});save();render();
 }
 function undoCreditInvoice(cardId,month=selectedMonth){
-  const p=invoicePayment(cardId,month);
-  if(!p) return;
-  if(!confirm('Desmarcar esta fatura como paga? A saída criada também será removida.')) return;
-  if(p.movId) data.movs=(data.movs||[]).filter(m=>m.id!==p.movId);
-  data.creditInvoicePayments=(data.creditInvoicePayments||[]).filter(x=>x.id!==p.id);
-  save();render();
+ if(!confirm('Desmarcar todos os pagamentos desta fatura e remover as saídas vinculadas?'))return;
+ const ids=data.creditInvoicePayments.filter(p=>p.cardId===cardId&&p.ym===month).map(p=>p.movId);
+ data.movs=data.movs.filter(m=>!ids.includes(m.id));data.creditInvoicePayments=data.creditInvoicePayments.filter(p=>!(p.cardId===cardId&&p.ym===month));save();render();
 }
 function addCreditCard(){
   const nome=cardNome.value.trim();
   const limite=parseFloat(cardLimite.value);
   let venc=parseInt(cardVencimento.value);
   let fech=parseInt(cardFechamento.value);
-  if(!nome||!limite){alert('Preenche nome e limite do cartão.');return}
+  if(!nome||!Number.isFinite(limite)||limite<=0){alert('Preenche nome e limite do cartão.');return}
   if(!venc||venc<1||venc>31) venc=10;
   if(!fech||fech<1||fech>31) fech=1;
   if(!data.creditCards) data.creditCards=[];
@@ -568,7 +704,9 @@ function addCreditPurchase(){
   const valor=parseFloat(purchaseValor.value);
   const parcelas=parseInt(purchaseParcelas.value)||1;
   const inicio=purchaseInicio.value||nowMonth();
-  if(!nome||!valor){alert('Preenche nome e valor da compra.');return}
+  if(parcelas<1||parcelas>600||!validMonth(inicio)){alert('Confira o mês e as parcelas (1 a 600).');return;}
+  if((data.creditInvoicePayments||[]).some(p=>p.cardId===cardId&&p.ym>=inicio)){alert('Desmarque as faturas pagas afetadas antes de alterar as compras.');return;}
+  if(!nome||!Number.isFinite(valor)||valor<=0){alert('Preenche nome e valor da compra.');return}
   if(!data.creditPurchases) data.creditPurchases=[];
   data.creditPurchases.unshift({id:uid(),cardId,nome,valor,parcelas,inicio,pagas:[]});
   purchaseNome.value='';purchaseValor.value='';purchaseParcelas.value='';purchaseInicio.value=nowMonth();
@@ -576,6 +714,7 @@ function addCreditPurchase(){
   save();render();
 }
 function delCreditCard(id){
+ if(data.creditInvoicePayments.some(p=>p.cardId===id)){alert('Este cartão possui pagamentos. Preserve o histórico ou desmarque-os antes de apagar.');return;}
   if(!confirm('Apagar cartão e compras vinculadas a ele?')) return;
   const payIds=(data.creditInvoicePayments||[]).filter(p=>p.cardId===id).map(p=>p.movId).filter(Boolean);
   data.movs=(data.movs||[]).filter(m=>!payIds.includes(m.id));
@@ -585,9 +724,9 @@ function delCreditCard(id){
   save();render();
 }
 function delCreditPurchase(id){
-  if(!confirm('Apagar essa compra do cartão?')) return;
-  data.creditPurchases=(data.creditPurchases||[]).filter(p=>p.id!==id);
-  save();render();
+ const p=data.creditPurchases.find(p=>p.id===id);if(!p)return;
+ for(let i=0;i<p.parcelas;i++)if(Finance.invoicePaid(data,p.cardId,addMonths(p.inicio,i))>0){alert('Desmarque as faturas pagas desta compra antes de apagá-la.');return;}
+ if(confirm('Apagar essa compra do cartão?')){data.creditPurchases=data.creditPurchases.filter(p=>p.id!==id);save();render();}
 }
 function cardStatus(card,month=selectedMonth){
   const invoice=creditMonthAmount(card.id,month);
@@ -631,21 +770,115 @@ function renderCreditCards(){
       const payBtn=s.invoice>0
         ? (s.paid
           ? `<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desmarcar pagamento</button>`
-          : `<button class="ghost" onclick="payCreditInvoice('${c.id}','${selectedMonth}')">Pagar fatura</button>`)
+          : `<button class="ghost" onclick="payCreditInvoice('${c.id}','${selectedMonth}')">Pagar restante</button>${invoicePayment(c.id,selectedMonth)?`<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desmarcar pagamentos</button>`:''}`)
         : '';
-      return `<div class="card">
-        <div class="debtTop">
-          <div>
-            <div class="debtName">💳 ${escapeHtml(c.nome)}</div>
-            <div class="debtMeta">Vence dia ${String(c.vencimento||10).padStart(2,'0')} • fecha dia ${String(c.fechamento||1).padStart(2,'0')}</div>
-            <div class="debtMeta">Fatura ${monthName(selectedMonth)}: ${fmt(s.invoice)} • limite comprometido: ${fmt(s.used)}</div>
-            <span class="invoiceTag ${s.paid?'paid':'open'}">${s.paid?'✓ FATURA PAGA':'• FATURA '+(s.invoice>0?'ABERTA':'SEM LANÇAMENTOS')}</span>
-          </div>
-          <div class="val ${s.available<0?'red':'green'}">${fmt(s.available)}</div>
-        </div>
-        <div class="progressBg" style="margin-top:12px"><div class="progressFill" style="width:${pct}%;background:${pct<70?'#35f477':pct<90?'#e5c36a':'#ff5265'}"></div></div>
-        <div class="cardActionRow">${payBtn}<button class="ghost danger" onclick="delCreditCard('${c.id}')">Apagar cartão</button></div>
-      </div>`
+      return `
+<details class="creditCompact">
+
+  <summary class="creditSummary">
+
+    <div>
+      <div class="creditName">
+        💳 ${escapeHtml(c.nome)}
+      </div>
+
+      <div class="creditMeta">
+        vence dia ${String(c.vencimento||10).padStart(2,'0')}
+        • fecha dia ${String(c.fechamento||1).padStart(2,'0')}
+      </div>
+    </div>
+
+
+    <div class="creditCompactRight">
+
+      <div class="creditInvoice">
+        ${fmt(s.invoice)}
+      </div>
+
+      <div class="creditStatus ${s.paid?'paid':'open'}">
+        ${
+          s.paid
+            ? '● PAGA'
+            : s.invoice>0
+              ? '● ABERTA'
+              : '● SEM LANÇAMENTOS'
+        }
+      </div>
+
+    </div>
+
+
+    <div class="creditChevron">›</div>
+
+  </summary>
+
+
+  <div class="creditExpanded">
+
+    <div class="creditInfoGrid">
+
+      <div class="creditInfoBox">
+        <span>FATURA ${monthName(selectedMonth).toUpperCase()}</span>
+        <b class="yellow">${fmt(s.invoice)}</b>
+      </div>
+
+      <div class="creditInfoBox">
+        <span>LIMITE TOTAL</span>
+        <b>${fmt(c.limite||0)}</b>
+      </div>
+
+      <div class="creditInfoBox">
+        <span>UTILIZADO</span>
+        <b class="red">${fmt(s.used)}</b>
+      </div>
+
+      <div class="creditInfoBox">
+        <span>DISPONÍVEL</span>
+        <b class="${s.available<0?'red':'green'}">
+          ${fmt(s.available)}
+        </b>
+      </div>
+
+    </div>
+
+
+    <div class="progressBg">
+      <div
+        class="progressFill"
+        style="
+          width:${pct}%;
+          background:${
+            pct<70
+              ? '#35f477'
+              : pct<90
+                ? '#e5c36a'
+                : '#ff5265'
+          };
+        ">
+      </div>
+    </div>
+
+
+    <div class="creditMeta" style="margin-top:9px">
+      ${pct}% do limite comprometido
+    </div>
+
+
+    <div class="cardActionRow">
+
+      ${payBtn}
+
+      <button
+        class="ghost danger"
+        onclick="delCreditCard('${c.id}')">
+        Apagar
+      </button>
+
+    </div>
+
+  </div>
+
+</details>`
     }).join('')||'<div class="empty">Nenhum cartão cadastrado ainda.</div>';
   }
 
@@ -654,29 +887,130 @@ function renderCreditCards(){
     purchaseList.innerHTML=purchases.map(p=>{
       const card=data.creditCards.find(c=>c.id===p.cardId);
       const parcelas=Math.max(1,parseInt(p.parcelas)||1);
-      const valorParcela=(parseFloat(p.valor)||0)/parcelas;
+      const valorParcela=Finance.installment(p,0);
       const fim=addMonths(p.inicio,parcelas-1);
       const active=monthsBetween(p.inicio,selectedMonth)>=0 && monthsBetween(p.inicio,selectedMonth)<parcelas;
       const installment=active?monthsBetween(p.inicio,selectedMonth)+1:null;
-      return `<div class="item" style="${active?'':'opacity:.65'}">
-        <div class="itemLeft">
-          <div class="icon">🧾</div>
-          <div>
-            <div class="name">${escapeHtml(p.nome)}</div>
-            <div class="sub">${card?escapeHtml(card.nome):'Cartão apagado'} • ${parcelas}x de ${fmt(valorParcela)} • ${monthName(p.inicio)} até ${monthName(fim)}${active?' • parcela '+installment+'/'+parcelas:''}</div>
-          </div>
-        </div>
-        <div>
-          <div class="val ${active?'yellow':''}">${active?fmt(valorParcela):fmt(p.valor)}</div>
-          <div class="smallBtns"><button class="ghost danger" onclick="delCreditPurchase('${p.id}')">X</button></div>
-        </div>
-      </div>`
+      return `
+<details
+  class="purchaseCompact"
+  style="${active?'':'opacity:.65'}">
+
+  <summary class="purchaseSummary">
+
+    <div>
+
+      <div class="purchaseName">
+        ${escapeHtml(p.nome)}
+      </div>
+
+      <div class="purchaseMeta">
+        ${card ? escapeHtml(card.nome) : 'Cartão apagado'}
+        • ${parcelas}x de ${fmt(valorParcela)}
+        ${
+          active
+            ? ' • parcela '+installment+'/'+parcelas
+            : ''
+        }
+      </div>
+
+    </div>
+
+
+    <div class="purchaseRight">
+
+      <div class="purchaseValue">
+        ${active ? fmt(valorParcela) : fmt(p.valor)}
+      </div>
+
+      <div class="purchaseStatus">
+        ${
+          active
+            ? 'PARCELA '+installment+'/'+parcelas
+            : 'FORA DO MÊS'
+        }
+      </div>
+
+    </div>
+
+
+    <div class="purchaseChevron">›</div>
+
+  </summary>
+
+
+  <div class="purchaseExpanded">
+
+    <div class="purchaseInfo">
+
+      <div>
+        Cartão:
+        <b>${card ? escapeHtml(card.nome) : 'Cartão apagado'}</b>
+      </div>
+
+      <div>
+        Valor total:
+        <b>${fmt(p.valor)}</b>
+      </div>
+
+      <div>
+        Parcelamento:
+        <b>${parcelas}x de ${fmt(valorParcela)}</b>
+      </div>
+
+      <div>
+        Período:
+        <b>${monthName(p.inicio)} até ${monthName(fim)}</b>
+      </div>
+
+      ${
+        active
+          ? `<div>
+               Parcela atual:
+               <b>${installment}/${parcelas}</b>
+             </div>`
+          : ''
+      }
+
+    </div>
+
+
+    <div class="purchaseActions">
+
+      <button
+        class="ghost danger"
+        onclick="delCreditPurchase('${p.id}')">
+        Apagar compra
+      </button>
+
+    </div>
+
+  </div>
+
+</details>`
     }).join('')||'<div class="empty">Nenhuma compra parcelada cadastrada.</div>';
   }
 }
 
+function updateMovMonthInfo(){
+  const el=document.getElementById('movMonthInfoValue');
+  if(!el) return;
 
+  const [ano,mes]=selectedMonth.split('-');
+
+  const texto=new Date(
+    Number(ano),
+    Number(mes)-1,
+    1
+  ).toLocaleDateString('pt-BR',{
+    month:'long',
+    year:'numeric'
+  });
+
+  el.textContent=texto.toUpperCase();
+}
 function openMovModal(){
+  updateMovMonthInfo();
   const m=document.getElementById('movModal');
   if(m){m.classList.add('open');setTimeout(()=>{const i=document.getElementById('movNome'); if(i)i.focus()},80)}
 }
@@ -764,15 +1098,12 @@ function financeEvents(month=selectedMonth){
   return events.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || a.type.localeCompare(b.type));
 }
 function projectionForMonth(month=selectedMonth){
-  const t=totals(month);
-  const openDebt=Math.max(0,currentMonthDebtTotal(month)-currentMonthDebtPaid(month));
-  const openCard=(data.creditCards||[]).reduce((sum,c)=>{
-    const invoice=creditMonthAmount(c.id,month);
-    return sum+(invoiceIsPaid(c.id,month)?0:invoice);
-  },0);
-  const pendingJobs=jobsInMonth(month).filter(j=>!isJobPaid(j)).reduce((s,j)=>s+(parseFloat(j.valor)||0),0);
-  const open=openDebt+openCard;
-  return {now:t.saldo,openDebt,openCard,open,pendingJobs,safe:t.saldo-open,withJobs:t.saldo-open+pendingJobs};
+ const t=totals(month),openRows=Finance.obligations(data,month).filter(r=>!r.paid);
+ const openDebt=Finance.amount(openRows.filter(r=>r.kind==='debt').reduce((s,r)=>s+r.value,0));
+ const openCard=Finance.amount(openRows.filter(r=>r.kind==='card').reduce((s,r)=>s+r.value,0));
+ const pendingJobs=jobsInMonth(month).filter(j=>!isJobPaid(j)&&jobIndex(j.status)>0).reduce((s,j)=>s+Number(j.valor),0);
+ const reserved=Finance.amount(data.wishes.reduce((s,w)=>s+Number(w.guardado||0),0)),open=Finance.amount(openDebt+openCard);
+ return {now:t.saldo,openDebt,openCard,open,pendingJobs,reserved,safe:Finance.amount(t.saldo-open-reserved),withJobs:Finance.amount(t.saldo-open-reserved+pendingJobs)};
 }
 function renderFinanceCalendar(){
   const cal=document.getElementById('financeCalendar');
@@ -787,7 +1118,7 @@ function renderFinanceCalendar(){
   const heads=['SEG','TER','QUA','QUI','SEX','SÁB','DOM'];
   let out=heads.map(h=>`<div class="calendarHead">${h}</div>`).join('');
   for(let i=0;i<start;i++) out+='<div class="calDay mutedDay"></div>';
-  const todayISO=new Date().toISOString().slice(0,10);
+  const todayISO=Finance.localDate();
   for(let day=1;day<=days;day++){
     const iso=dateISOForMonthDay(month,day);
     const dayEvents=events.filter(e=>e.date===iso);
@@ -820,7 +1151,8 @@ function exportCalendarICS(){
     lines.push('UID:'+icsEscape('san-'+selectedMonth+'-'+i+'-'+uid()));
     lines.push('DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z'));
     lines.push('DTSTART;VALUE=DATE:'+compact);
-    lines.push('DTEND;VALUE=DATE:'+compact);
+    const end=new Date(e.date+'T12:00:00');end.setDate(end.getDate()+1);
+    lines.push('DTEND;VALUE=DATE:'+end.getFullYear()+String(end.getMonth()+1).padStart(2,'0')+String(end.getDate()).padStart(2,'0'));
     lines.push('SUMMARY:'+icsEscape(e.title+' • SAN Finance'));
     lines.push('DESCRIPTION:'+icsEscape(e.meta+' • '+fmt(e.value)));
     lines.push('BEGIN:VALARM');
@@ -839,20 +1171,166 @@ function exportCalendarICS(){
   setTimeout(()=>URL.revokeObjectURL(url),800);
 }
 
+function daysLeftInMonth(month=selectedMonth){
+  const [year,numberMonth]=month.split('-').map(Number);
+  const lastDay=new Date(year,numberMonth,0).getDate();
+
+  if(month===nowMonth()){
+    return Math.max(1,lastDay-new Date().getDate()+1);
+  }
+
+  return lastDay;
+}
+
+function buildHomeInsight(proj){
+  if(proj.safe<0 && proj.withJobs<0){
+    return `Mesmo recebendo todos os jobs, ainda faltarão ${fmt(Math.abs(proj.withJobs))}. Um novo job desse valor já faria o mês fechar no positivo.`;
+  }
+
+  if(proj.safe<0 && proj.withJobs>=0){
+    return `Hoje faltam ${fmt(Math.abs(proj.safe))} para cobrir tudo. Seus jobs podem resolver essa diferença, mas esse dinheiro ainda não está na conta.`;
+  }
+
+  if(proj.pendingJobs>0){
+    return `Suas contas estão cobertas. Você possui ${fmt(proj.safe)} livres e pode terminar o mês com ${fmt(proj.withJobs)} após receber os jobs.`;
+  }
+
+  if(proj.safe>0){
+    return `Todas as contas estão cobertas. Você pode usar até ${fmt(proj.safe)} sem deixar o mês negativo.`;
+  }
+
+  return 'Seu dinheiro atual está totalmente reservado para os compromissos do mês.';
+}
+
+function simulatePurchase(){
+  const item=prompt('O que você está pensando em comprar?');
+
+  if(item===null) return;
+
+  const rawValue=prompt('Qual é o valor da compra?');
+
+  if(rawValue===null) return;
+
+  let valueText=String(rawValue).trim();
+
+  if(valueText.includes(',') && valueText.includes('.')){
+    valueText=valueText.replace(/\./g,'').replace(',','.');
+  }else{
+    valueText=valueText.replace(',','.');
+  }
+
+  const value=Number(valueText);
+
+  if(!value || value<=0){
+    alert('Digite um valor válido.');
+    return;
+  }
+
+  const proj=projectionForMonth(selectedMonth);
+  const guaranteedAfter=proj.safe-value;
+  const expectedAfter=proj.withJobs-value;
+
+  if(guaranteedAfter>=0){
+    alert(
+      `${item}\n\n`+
+      `Compra: ${fmt(value)}\n`+
+      `Saldo livre depois: ${fmt(guaranteedAfter)}\n\n`+
+      `Você consegue comprar sem comprometer as contas.`
+    );
+    return;
+  }
+
+  if(expectedAfter>=0){
+    alert(
+      `${item}\n\n`+
+      `Compra: ${fmt(value)}\n`+
+      `Saldo garantido: ${fmt(guaranteedAfter)}\n`+
+      `Com os jobs recebidos: ${fmt(expectedAfter)}\n\n`+
+      `Só cabe no orçamento se os jobs forem pagos.`
+    );
+    return;
+  }
+
+  alert(
+    `${item}\n\n`+
+    `Compra: ${fmt(value)}\n`+
+    `Fim do mês: ${fmt(expectedAfter)}\n\n`+
+    `Essa compra deixaria o mês negativo em ${fmt(Math.abs(expectedAfter))}.`
+  );
+}
+
 function render(){
+  renderPayPlan();
+  updateMovMonthInfo();
   if(!data.creditCards) data.creditCards=[]; if(!data.creditPurchases) data.creditPurchases=[];
   monthLabel.textContent=monthLabelSmart(selectedMonth);
   syncMonthPicker();
   const t=totals(selectedMonth);
   const proj=projectionForMonth(selectedMonth);
   if(typeof projNow!=='undefined'){
-    projNow.textContent=fmt(proj.now);
-    projOpen.textContent=fmt(proj.open);
-    projSafe.textContent=fmt(proj.safe);
-    projWithJobs.textContent=fmt(proj.withJobs);
-    projSafe.className=proj.safe>=0?'green':'red';
-    projNote.textContent=`Contas abertas: ${fmt(proj.openDebt)} • faturas abertas: ${fmt(proj.openCard)} • jobs a receber: ${fmt(proj.pendingJobs)}.`;
+  projNow.textContent=fmt(proj.now);
+  projOpen.textContent=fmt(proj.pendingJobs);
+  projSafe.textContent=fmt(proj.safe);
+  projWithJobs.textContent=fmt(proj.withJobs);
+
+  projSafe.className=proj.safe>=0?'green':'red';
+  projWithJobs.className=proj.withJobs>=0?'green':'red';
+
+  projNote.textContent=
+    `Saldo atual ${fmt(proj.now)} − contas ${fmt(proj.openDebt)} `+
+    `− cartão ${fmt(proj.openCard)} − metas ${fmt(proj.reserved)} + jobs ${fmt(proj.pendingJobs)}.`;
+
+  const spendable=Math.max(0,proj.safe);
+  const days=daysLeftInMonth(selectedMonth);
+
+  const canSpendEl=document.getElementById('canSpend');
+  const canSpendDailyEl=document.getElementById('canSpendDaily');
+
+  if(canSpendEl){
+    canSpendEl.textContent=fmt(spendable);
   }
+
+  if(canSpendDailyEl){
+    canSpendDailyEl.textContent=spendable>0
+      ? `${fmt(spendable/days)} por dia até o fim do mês.`
+      : 'Seu dinheiro atual já está comprometido.';
+  }
+}
+{
+  const cardEl=document.getElementById('canSpendCard');
+  const badgeEl=document.getElementById('canSpendBadge');
+  const valueEl=document.getElementById('canSpend');
+
+  if(cardEl && badgeEl && valueEl){
+
+    if(proj.safe>0){
+      badgeEl.textContent='SEGURO';
+cardEl.classList.remove('attention');
+      badgeEl.style.color='#70ff8f';
+      badgeEl.style.borderColor='rgba(112,255,143,.35)';
+      badgeEl.style.background='rgba(112,255,143,.10)';
+
+      valueEl.style.color='#70ff8f';
+      cardEl.style.borderColor='rgba(0,240,106,.28)';
+      cardEl.style.background=
+        'linear-gradient(135deg,rgba(0,240,106,.08),rgba(255,255,255,.025))';
+
+    }else{
+      badgeEl.textContent='ATENÇÃO';
+      cardEl.classList.add('attention');
+
+      badgeEl.style.color='#ff5c6c';
+      badgeEl.style.borderColor='rgba(255,92,108,.40)';
+      badgeEl.style.background='rgba(255,92,108,.12)';
+
+      valueEl.style.color='#ff5c6c';
+      cardEl.style.borderColor='rgba(255,92,108,.35)';
+      cardEl.style.background=
+        'linear-gradient(135deg,rgba(255,92,108,.10),rgba(255,255,255,.025))';
+    }
+  }
+}
+
 
   if(typeof quickDebtMonth!=='undefined'){
     const debtMonth=currentMonthDebtTotal(selectedMonth);
@@ -862,27 +1340,119 @@ function render(){
     quickDebtOpen.textContent=fmt(Math.max(0,debtMonth-debtPaid));
   }
 
-  saldo.textContent=fmt(t.saldo); saldo.className='bigMoney '+(t.saldo>500?'ok':t.saldo>200?'warn':'bad');
-  totIn.textContent=fmt(t.entrada); totOut.textContent=fmt(t.saida); if(typeof saldoHero!=='undefined') saldoHero.textContent=fmt(t.totalDividas||0);
-  const baseEntrada=Math.max(1,t.entrada||data.salario||1);
-  const pct=Math.min(100,Math.round((t.saida/baseEntrada)*100));
-  const sobraPct=Math.max(0,Math.round((t.saldo/baseEntrada)*100));
-  pctText.textContent=pct+'%';
-  progress.style.width=pct+'%'; progress.style.background=pct<60?'#00f06a':pct<85?'#f5c84b':'#ff4d5e';
-  if(typeof progressFooter!=='undefined') progressFooter.textContent=pct<60?'Seu mês está saudável. Você está gastando menos do que entrou.':pct<85?'Atenção: seus gastos já consumiram boa parte das entradas.':'Cuidado: o mês está pesado. Revise gastos e parcelas.';
-  if(typeof homeStatus!=='undefined') homeStatus.textContent=t.saldo>=0?`Você está positivo este mês. Sobrou ${fmt(t.saldo)} até agora (${sobraPct}% das entradas).`:`Você está negativo este mês em ${fmt(Math.abs(t.saldo))}.`;
-  const dicas=['Controle não é prisão. É direção.','Seu dinheiro precisa trabalhar para sua liberdade.','Uma parcela marcada como paga é um passo a menos na dívida.','Todo freela precisa virar parte da sua organização.','Antes de comprar, pergunta: isso aproxima ou afasta da minha meta?'];
-  dailyQuote.textContent=dicas[Math.floor(Math.random()*dicas.length)];
-  lastList.innerHTML=movsInMonth(selectedMonth).slice(0,8).map(m=>`<div class="item">
+  saldo.textContent=fmt(proj.safe);
+
+saldo.className='bigMoney '+
+  (proj.safe>500?'ok':proj.safe>=0?'warn':'bad');
+
+totIn.textContent=fmt(proj.now);
+totOut.textContent=fmt(proj.open+proj.reserved);
+
+if(typeof saldoHero!=='undefined'){
+  saldoHero.textContent=fmt(proj.pendingJobs);
+}
+
+const baseEntrada=Math.max(1,t.entrada||data.salario||1);
+const pct=Math.min(100,Math.round((t.saida/baseEntrada)*100));
+
+pctText.textContent=pct+'%';
+progress.style.width=pct+'%';
+
+progress.style.background=
+  pct<60?'#00f06a':
+  pct<85?'#f5c84b':
+  '#ff4d5e';
+
+if(typeof progressFooter!=='undefined'){
+  progressFooter.textContent=
+    pct<60
+      ? 'Seu mês está saudável. Você está gastando menos do que entrou.'
+      : pct<85
+        ? 'Atenção: seus gastos já consumiram boa parte das entradas.'
+        : 'Cuidado: o mês está pesado. Revise gastos e parcelas.';
+}
+
+const totalCommitted=
+  Number(t.saida||0)+Number(proj.open||0);
+
+const commitmentPct=Math.max(
+  0,
+  Math.round((totalCommitted/baseEntrada)*100)
+);
+
+const commitmentWidth=Math.min(100,commitmentPct);
+
+const commitmentPctTextEl=
+  document.getElementById('commitmentPctText');
+
+const commitmentProgressEl=
+  document.getElementById('commitmentProgress');
+
+const commitmentFooterEl=
+  document.getElementById('commitmentFooter');
+
+if(commitmentPctTextEl){
+  commitmentPctTextEl.textContent=commitmentPct+'%';
+
+  commitmentPctTextEl.style.color=
+    commitmentPct<70
+      ? '#00f06a'
+      : commitmentPct<100
+        ? '#f5c84b'
+        : '#ff5c6c';
+}
+
+if(commitmentProgressEl){
+  commitmentProgressEl.style.width=
+    commitmentWidth+'%';
+
+  commitmentProgressEl.style.background=
+    commitmentPct<70
+      ? '#00f06a'
+      : commitmentPct<100
+        ? '#f5c84b'
+        : '#ff5c6c';
+}
+
+if(commitmentFooterEl){
+
+  if(commitmentPct<70){
+    commitmentFooterEl.textContent=
+      'Mesmo considerando as contas futuras, seu mês ainda possui uma boa margem.';
+
+  }else if(commitmentPct<100){
+    commitmentFooterEl.textContent=
+      `Contas e gastos já comprometem ${commitmentPct}% das entradas deste mês.`;
+
+  }else{
+    commitmentFooterEl.textContent=
+      `Atenção: gastos e contas futuras ultrapassam suas entradas em ${commitmentPct-100}%.`;
+  }
+}
+
+if(typeof homeStatus!=='undefined'){
+  homeStatus.textContent=proj.safe>=0
+    ? `Depois de reservar todas as contas, você possui ${fmt(proj.safe)} realmente livres.`
+    : `Seu saldo atual não cobre ${fmt(Math.abs(proj.safe))} dos compromissos deste mês.`;
+}
+
+if(typeof dailyQuote!=='undefined'){
+  dailyQuote.textContent=buildHomeInsight(proj);
+}
+
+  lastList.innerHTML=movsInMonth(selectedMonth).map(m=>`<div class="item">
     <div class="itemLeft">
-      <div class="icon">${String(m.cat||'🎯').split(' ')[0]}</div>
+      <div class="icon">${escapeHtml(String(m.cat||'🎯').split(' ')[0])}</div>
       <div>
         <div class="name">${escapeHtml(m.nome||'Sem nome')}</div>
-        <div class="sub">${m.date||''} ${m.time?'· '+m.time:''}</div>
+        <div class="sub">${escapeHtml(m.date||'')} ${m.time?'· '+escapeHtml(m.time):''}</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="val ${m.tipo==='entrada'?'green':'red'}">${m.tipo==='entrada'?'+':'-'}${fmt(parseFloat(m.valor)||0)}</div>
+      <button class="ghost"
+  style="padding:7px 9px"
+  onclick="editMov('${m.id}')">✏️</button>
       <button class="ghost danger" style="padding:7px 9px" onclick="delMov('${m.id}')">×</button>
     </div>
   </div>`).join('')||'<div class="empty">Nenhum lançamento ainda.</div>';
@@ -907,29 +1477,171 @@ function render(){
         dots+=`<button class="dot ${d.pagos.includes(i)?'paid':i===idxMes?'now':''}" title="${venc}" onclick="toggleDebt('${d.id}',${i})">${i+1}</button>`
       }
     }
-    return `<div class="card debtCard" style="${isCurrent?'':'opacity:.55'}">
-      <div class="debtTop">
-        <div>
-          <div class="debtName">${d.nome}</div>
-          <div class="debtMeta">${isCurrent ? 'Conta deste mês • '+(isPaidThisMonth?'paga':'pendente') : 'Não cai neste mês'}</div>
-          <div class="debtMeta">${d.fixa ? 'Conta fixa mensal • histórico pago em '+((d.paidMonths||[]).length)+' mês(es)' : paid+'/'+d.meses+' meses pagos • faltam '+left+' • restante total '+fmt(rest)}</div>
-          <div class="debtMeta">📅 Vence todo dia ${String(d.dia||10).padStart(2,'0')} ${isCurrent && !d.fixa ? '• parcela '+(idxMes+1)+'/'+d.meses : ''}</div>
-        </div>
-        <div class="val ${isPaidThisMonth?'green':'yellow'}">${isCurrent?fmt(d.valor):'—'}</div>
+    return `
+<details class="debtCompact" style="${isCurrent?'':'opacity:.55'}">
+
+  <summary class="debtSummary">
+
+    <div>
+      <div class="debtCompactName">
+        ${escapeHtml(d.nome)}
       </div>
-      <div class="progressBg" style="margin-top:12px"><div class="progressFill" style="width:${d.fixa?(isPaidThisMonth?100:0):Math.round((paid/Math.max(1,d.meses))*100)}%;background:#00f06a"></div></div>
-      <div class="monthDots">${dots}</div>
-      <div class="debtActions">
-        <button class="ghost" ${isCurrent?'':d.fixa?'disabled style="opacity:.4"':''} onclick="toggleDebt('${d.id}',${d.fixa?0:(idxMes>=0?idxMes:(paid<d.meses?paid:d.meses-1))})">${isCurrent?(isPaidThisMonth?'Desmarcar pagamento':'Marcar pago do mês'):(d.fixa?'Ainda não iniciou':'Marcar próxima parcela')}</button>
-        <button class="ghost" onclick="editDebtDay('${d.id}')">Editar vencimento</button>
-        <button class="ghost danger" onclick="delDebt('${d.id}')">Apagar</button>
+
+      <div class="debtCompactMeta">
+
+        <span class="debtTypeTag">
+          ${
+            d.fixa
+              ? 'FIXA'
+              : (isCurrent && idxMes>=0
+                  ? (idxMes+1)+'/'+d.meses
+                  : 'PARCELADA')
+          }
+        </span>
+
+        <span>
+          vence dia ${String(d.dia||10).padStart(2,'0')}
+        </span>
+
       </div>
-    </div>`
+    </div>
+
+    <div class="debtCompactRight">
+
+      <div class="debtCompactValue">
+        ${isCurrent ? fmt(d.valor) : '—'}
+      </div>
+
+      <div class="debtStatus ${
+        !isCurrent
+          ? 'neutral'
+          : isPaidThisMonth
+            ? 'paid'
+            : 'pending'
+      }">
+
+        ${
+          !isCurrent
+            ? 'FORA DO MÊS'
+            : isPaidThisMonth
+              ? '● PAGO'
+              : '● PENDENTE'
+        }
+
+      </div>
+
+    </div>
+
+    <div class="debtChevron">›</div>
+
+  </summary>
+
+
+  <div class="debtExpanded">
+
+    <div class="debtExpandedInfo">
+
+      ${
+        d.fixa
+          ? 'Conta fixa mensal • histórico pago em ' +
+            ((d.paidMonths||[]).length) +
+            ' mês(es)'
+          : paid + '/' + d.meses +
+            ' parcelas pagas • faltam ' +
+            left +
+            ' • restante ' +
+            fmt(rest)
+      }
+
+    </div>
+
+
+    <div class="progressBg">
+      <div
+        class="progressFill"
+        style="
+          width:${
+            d.fixa
+              ? (isPaidThisMonth?100:0)
+              : Math.round(
+                  (paid/Math.max(1,d.meses))*100
+                )
+          }%;
+          background:var(--green);
+        ">
+      </div>
+    </div>
+
+
+    <div class="monthDots">
+      ${dots}
+    </div>
+
+
+    <div class="debtActions">
+
+      <button
+        class="ghost"
+        ${isCurrent?'':d.fixa?'disabled style="opacity:.4"':''}
+        onclick="
+          toggleDebt(
+            '${d.id}',
+            ${
+              d.fixa
+                ? 0
+                : (
+                    idxMes>=0
+                      ? idxMes
+                      : (
+                          paid<d.meses
+                            ? paid
+                            : d.meses-1
+                        )
+                  )
+            }
+          )
+        ">
+
+        ${
+          isCurrent
+            ? (
+                isPaidThisMonth
+                  ? '✓ Desmarcar'
+                  : '✓ Marcar pago'
+              )
+            : (
+                d.fixa
+                  ? 'Ainda não iniciou'
+                  : '✓ Próxima parcela'
+              )
+        }
+
+      </button>
+
+
+      <button
+        class="ghost"
+        onclick="editDebtDay('${d.id}')">
+        ✎ Vencimento
+      </button>
+
+
+      <button
+        class="ghost danger"
+        onclick="delDebt('${d.id}')">
+        Apagar
+      </button>
+
+    </div>
+
+  </div>
+
+</details>`
   }).join('')||'<div class="empty">Nenhuma dívida cadastrada.</div>';
     const monthJobs=jobsInMonth(selectedMonth);
-    const paidJobs=monthJobs.filter(j=>isJobPaid(j)).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
-    const pendJobs=monthJobs.filter(j=>!isJobPaid(j)).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
-    const jobsRevenue=paidJobs+pendJobs;
+    const paidJobs=data.jobs.filter(j=>isJobPaid(j)&&Finance.jobMonth(j)===selectedMonth).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
+    const pendJobs=monthJobs.filter(j=>!isJobPaid(j)&&jobIndex(j.status)>0).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
+    const jobsRevenue=monthJobs.filter(j=>jobIndex(j.status)>0).reduce((s,j)=>s+Number(j.valor),0);
     const jobsCosts=monthJobs.reduce((sum,j)=>sum+jobCostTotal(j),0);
     const jobsProfit=jobsRevenue-jobsCosts;
   jobPaid.textContent=fmt(paidJobs); jobPend.textContent=fmt(pendJobs); jobQtd.textContent=monthJobs.length;
@@ -961,7 +1673,7 @@ function render(){
         <div>
           <div class="jobClient">${escapeHtml(j.cliente)}</div>
           <div class="statusBadge" style="background:${st.color}22;border-color:${st.color}77;color:${st.color}">${st.label}</div>
-          <div class="jobMeta">${jobEventInfo(j.dataEvento)}${j.obs?' • '+escapeHtml(j.obs):''}</div>
+          <div class="jobMeta">${jobEventInfo(j.dataEvento)}${isJobPaid(j)?' • recebido em '+monthName(Finance.jobMonth(j)):''}${j.obs?' • '+escapeHtml(j.obs):''}</div>
         </div>
         <div style="text-align:right">
           <div class="jobValue ${isJobPaid(j)?'green':'yellow'}">${fmt(j.valor)}</div>
@@ -1006,7 +1718,74 @@ function render(){
   }
   wishList.innerHTML=data.wishes.map(w=>{
     const pct=Math.min(100,Math.round((w.guardado/w.valor)*100));
-    return `<div class="card"><div class="wishImg">✦</div><div class="debtTop" style="margin-top:12px"><div><div class="debtName">${w.nome}</div><div class="debtMeta">${fmt(w.guardado)} de ${fmt(w.valor)} • ${pct}%</div></div></div><div class="progressBg" style="margin-top:12px"><div class="progressFill" style="width:${pct}%;background:#fff"></div></div><div class="smallBtns"><button class="ghost" onclick="addWishMoney('${w.id}')">Adicionar valor</button><button class="ghost danger" onclick="delWish('${w.id}')">Apagar</button></div></div>`
+    return `<div class="card"><div class="wishImg">✦</div><div class="debtTop" style="margin-top:12px"><div><div class="debtName">${escapeHtml(w.nome)}</div><div class="debtMeta">${fmt(w.guardado)} de ${fmt(w.valor)} • ${pct}%</div></div></div><div class="progressBg" style="margin-top:12px"><div class="progressFill" style="width:${pct}%;background:#fff"></div></div><div class="smallBtns"><button class="ghost" onclick="addWishMoney('${w.id}')">Adicionar valor</button><button class="ghost" onclick="withdrawWish('${w.id}')">Retirar reserva</button><button class="ghost danger" onclick="delWish('${w.id}')">Apagar</button></div></div>`
   }).join('')||'<div class="empty">Nenhum desejo cadastrado.</div>';
 }
+function validMonth(v){return /^\d{4}-(0[1-9]|1[0-2])$/.test(v||'');}
+function validDate(v){return /^\d{4}-\d{2}-\d{2}$/.test(v||'')&&!Number.isNaN(new Date(v+'T12:00:00').getTime())&&new Date(v+'T12:00:00').toISOString().slice(0,10)===v;}
+function validateBackup(d){
+ if(!d||Array.isArray(d)||typeof d!=='object'||!Array.isArray(d.movs)||!Array.isArray(d.debts)||!Array.isArray(d.jobs)||!Array.isArray(d.wishes))throw Error('Formato inválido');
+ const copy=JSON.parse(JSON.stringify(d));
+ const arrays=['movs','debts','jobs','wishes','creditCards','creditPurchases','creditInvoicePayments'];
+ const money=(o,key,optional=false)=>{if(optional&&o[key]===undefined)return;o[key]=Number(o[key]);if(!Number.isFinite(o[key])||o[key]<0||o[key]>1e10)throw Error('Valor inválido');};
+ for(const a of arrays){if(copy[a]===undefined)copy[a]=[];if(!Array.isArray(copy[a]))throw Error('Lista inválida');for(const x of copy[a]){if(!x||typeof x!=='object'||Array.isArray(x))throw Error('Registro inválido');if(x.id&&!/^[\w-]+$/.test(String(x.id)))throw Error('Identificador inválido');}}
+ for(const m of copy.movs){money(m,'valor');if(!['entrada','gasto'].includes(m.tipo)||!validMonth(m.ym||movMonth(m)))throw Error('Movimento inválido');m.nome=String(m.nome||'');m.cat=String(m.cat||'');}
+ for(const d of copy.debts){money(d,'valor');if(!validMonth(d.inicio))throw Error('Mês inválido');d.dia=Number(d.dia||10);if(!Number.isInteger(d.dia)||d.dia<1||d.dia>31)throw Error('Dia inválido');d.meses=Number(d.meses||1);if(!Number.isInteger(d.meses)||d.meses<1||d.meses>600)throw Error('Parcelas inválidas');d.pagos=d.pagos||[];d.paidMonths=d.paidMonths||[];if(!Array.isArray(d.pagos)||!Array.isArray(d.paidMonths)||d.pagos.some(i=>!Number.isInteger(i)||i<0||i>=d.meses)||d.paidMonths.some(m=>!validMonth(m)))throw Error('Pagamentos inválidos');d.pagos=[...new Set(d.pagos)];d.paidMonths=[...new Set(d.paidMonths)];d.nome=String(d.nome||'');if(d.paymentRecords){for(const r of Object.values(d.paymentRecords)){if(!validDate(r.date))throw Error('Pagamento inválido');money(r,'value');}}}
+ for(const j of copy.jobs){money(j,'valor');j.cliente=String(j.cliente||'');j.status=String(j.status||'');if(j.dataEvento&&!validDate(j.dataEvento))throw Error('Evento inválido');if(j.paidMonth&&!validMonth(j.paidMonth))throw Error('Recebimento inválido');j.costs=j.costs||[];if(!Array.isArray(j.costs))throw Error('Custos inválidos');for(const c of j.costs){money(c,'valor');if(c.id&&!/^[\w-]+$/.test(String(c.id)))throw Error('Custo inválido');}}
+ for(const w of copy.wishes){money(w,'valor');money(w,'guardado');w.nome=String(w.nome||'');}
+ for(const c of copy.creditCards){money(c,'limite');c.nome=String(c.nome||'');for(const key of ['vencimento','fechamento']){c[key]=Number(c[key]||10);if(!Number.isInteger(c[key])||c[key]<1||c[key]>31)throw Error('Dia inválido');}}
+ for(const p of copy.creditPurchases){money(p,'valor');p.parcelas=Number(p.parcelas||1);if(!Number.isInteger(p.parcelas)||p.parcelas<1||p.parcelas>600||!validMonth(p.inicio))throw Error('Compra inválida');}
+ for(const p of copy.creditInvoicePayments){money(p,'valor');if(!validMonth(p.ym))throw Error('Fatura inválida');}
+ return copy;
+}
+function savePaySettings(){
+ const a=Number(document.getElementById('salary5').value),b=Number(document.getElementById('salary20').value);
+ if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0){alert('Digite valores válidos.');return;}
+ data.paySettings={day5:Finance.amount(a),day20:Finance.amount(b)};if(save()){render();alert('Salários previstos salvos.');}
+}
+function receiveSalary(day){
+ const key=selectedMonth+'-'+day;if(data.movs.some(m=>m.salaryKey===key)){alert('Recebimento já registrado.');return;}
+ const expected=Number((data.paySettings||{})['day'+day]||0);
+ const raw=prompt('Valor realmente recebido em R$',String(expected).replace('.',','));if(raw===null)return;
+ const value=Number(raw.replace(',','.'));if(!Number.isFinite(value)||value<=0){alert('Valor inválido.');return;}
+ const date=prompt('Data do recebimento (AAAA-MM-DD)',Finance.localDate());if(date===null)return;if(!validDate(date)){alert('Data inválida.');return;}
+ data.movs.unshift({id:uid(),tipo:'entrada',nome:'Salário • dia '+day,valor:Finance.amount(value),cat:'💰 Salário',ym:date.slice(0,7),date:date.split('-').reverse().join('/'),salaryKey:key});save();render();
+}
+function reconcileBalance(){
+ const raw=prompt('Saldo real total de hoje, incluindo dinheiro guardado nas metas (R$):');if(raw===null)return;
+ const value=Number(raw.replace(',','.'));if(!Number.isFinite(value)||value<0){alert('Valor inválido.');return;}
+ const difference=Finance.amount(value-totals(nowMonth()).saldo);if(!difference){alert('O saldo já confere.');return;}
+ if(!confirm('Registrar ajuste de '+fmt(difference)+' para o saldo passar a '+fmt(value)+'?'))return;
+ data.movs.unshift({id:uid(),tipo:difference>0?'entrada':'gasto',nome:'Ajuste de saldo conferido',valor:Math.abs(difference),cat:'⚖ Ajuste',ym:nowMonth(),date:Finance.localDate().split('-').reverse().join('/')});save();render();
+}
+function withdrawWish(id){
+ const w=data.wishes.find(w=>w.id===id);if(!w)return;
+ const raw=prompt('Quanto deseja liberar desta reserva?');if(raw===null)return;
+ const v=Number(raw.replace(',','.'));if(!Number.isFinite(v)||v<=0||v>w.guardado){alert('Valor inválido ou maior que a reserva.');return;}
+ w.guardado=Finance.amount(w.guardado-v);save();render();
+}
+function downloadOriginal(){
+ const raw=localStorage.getItem(KEY);if(!raw){alert('Não há dados locais.');return;}
+ const blob=new Blob([raw],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='san-dados-originais.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function payPlanItem(kind,id,index,month){if(kind==='card'){if(invoiceIsPaid(id,month))undoCreditInvoice(id,month);else payCreditInvoice(id,month);}else toggleDebt(id,index,month);}
+function renderPayPlan(){
+ const box=document.getElementById('payPlan');if(!box)return;
+ const settings=data.paySettings||{};
+ for(const day of [5,20]){const el=document.getElementById('salary'+day);if(el&&document.activeElement!==el)el.value=settings['day'+day]||0;}
+ const rows=Finance.obligations(data,selectedMonth);
+ const next=addMonths(selectedMonth,1);
+ const nextEarly=Finance.obligations(data,next).filter(r=>r.month===next&&r.day<5);
+ const groups=[{label:'Anteriores e dias 1–4',rows:rows.filter(r=>r.month<selectedMonth||r.day<5)},
+ {label:'Pagamento do dia 5',day:5,rows:rows.filter(r=>r.month===selectedMonth&&r.day>=5&&r.day<20)},
+ {label:'Pagamento do dia 20',day:20,rows:[...rows.filter(r=>r.month===selectedMonth&&r.day>=20),...nextEarly]}];
+ box.innerHTML=(storageBlocked?'<p class="red">Gravação bloqueada: seus dados originais foram preservados. Restaure um backup em Configurações.</p>':'')+'<h3>Planejamento • dias 5 e 20</h3><p class="sub">Previsto não é saldo. Confira os recebimentos já lançados antes de registrar o salário aqui.</p>'+groups.map(g=>{
+ const open=Finance.amount(g.rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.value),0));
+ const received=g.day&&data.movs.find(m=>m.salaryKey===selectedMonth+'-'+g.day),income=Number(settings['day'+g.day]||0);
+ const heading=`<div style="margin-top:16px"><b>${g.label}</b><div class="sub">Em aberto: ${fmt(open)}${g.day?' • salário previsto: '+fmt(income):''}</div>`;
+ const salary=g.day?`<button class="ghost" ${received?'disabled':''} onclick="receiveSalary(${g.day})">${received?'✓ Salário registrado: '+fmt(received.valor):'Registrar recebimento'}</button>`:'';
+ return heading+salary+g.rows.map(r=>`<div class="item"><div class="itemLeft"><div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${prettyISO(dateISOForMonthDay(r.month,r.day||10))} • ${monthName(r.month)} • ${fmt(r.value)}</div></div></div><button class="ghost" onclick="payPlanItem('${r.kind}','${r.id}',${r.index||0},'${r.month}')">${r.paid?'✓ Pago':'Pagar'}</button></div>`).join('')+(!g.rows.length?'<p class="sub">Nenhuma conta cadastrada neste período.</p>':'')+'</div>';
+ }).join('')+'<p class="sub">Configure os salários em Configurações. Contas dos dias 1 a 4 entram no planejamento do dia 20 do mês anterior.</p>';
+}
+
 debtInicio.value=nowMonth(); toggleDebtType(); render(); updateFab();
