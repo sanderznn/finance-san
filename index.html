@@ -3066,6 +3066,16 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 </div>
 
 
+<div class="modalOverlay" id="editDebtModal" onclick="if(event.target===this)closeEditDebt()">
+ <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="editDebtTitle">
+ <div class="modalTop"><h3 id="editDebtTitle">Editar conta</h3><button class="modalClose" onclick="closeEditDebt()" aria-label="Fechar">×</button></div>
+ <label for="editDebtName">Nome</label><div class="row"><input id="editDebtName" maxlength="160" placeholder="Nome da conta"></div>
+ <label for="editDebtAmount">Valor da conta ou parcela (R$)</label><div class="row"><input id="editDebtAmount" type="number" min="0.01" step="0.01" inputmode="decimal"></div>
+ <label for="editDebtDue">Dia do vencimento</label><div class="row"><input id="editDebtDue" type="number" min="1" max="31" step="1" inputmode="numeric"></div>
+ <p class="sub" style="margin:8px 0 16px">O novo valor vale para pagamentos pendentes. Os já pagos ficam preservados.</p>
+ <button class="primary" onclick="saveDebtEdit()">SALVAR ALTERAÇÕES</button>
+ </div></div>
+
 <div class="modalOverlay" id="movModal" onclick="if(event.target===this)closeMovModal()">
   <div class="modalCard">
     <div class="modalHead">
@@ -3441,17 +3451,17 @@ function currentMonthDebtTotal(month=nowMonth()){
   return currentMonthDebts(month).reduce((sum,d)=>{
     const idx=d.fixa?0:debtIndexForMonth(d,month);
     if(idx<0) return sum;
-    return sum+(parseFloat(d.valor)||0);
+    return sum+debtValueInMonth(d,month);
   },0);
 }
 function currentMonthDebtPaid(month=nowMonth()){
   return currentMonthDebts(month).reduce((sum,d)=>{
     if(d.fixa){
-      return (d.paidMonths||[]).includes(month) ? sum+(parseFloat(d.valor)||0) : sum;
+      return (d.paidMonths||[]).includes(month) ? sum+debtValueInMonth(d,month) : sum;
     }
     const idx=debtIndexForMonth(d,month);
     if(idx<0) return sum;
-    return (d.pagos||[]).includes(idx) ? sum+(parseFloat(d.valor)||0) : sum;
+    return (d.pagos||[]).includes(idx) ? sum+debtValueInMonth(d,month) : sum;
   },0);
 }
 
@@ -3927,12 +3937,44 @@ function debtStatusText(d){
   const next=Math.min(d.pagos.length,d.meses-1);
   return 'próx. pagamento: '+dueDateLabel(d,next);
 }
-function editDebtDay(id){
-  const d=data.debts.find(x=>x.id===id);
-  if(!d)return;
-  const novo=parseInt(prompt('Qual dia do mês essa conta vence?', d.dia||10));
-  if(!novo || novo<1 || novo>31){alert('Digite um dia entre 1 e 31.');return}
-  d.dia=novo; save(); render();
+let editingDebtId=null;
+function editDebt(id){
+ const d=data.debts.find(x=>x.id===id);if(!d)return;
+ editingDebtId=id;
+ document.getElementById('editDebtName').value=d.nome;
+ document.getElementById('editDebtAmount').value=d.valor;
+ document.getElementById('editDebtDue').value=d.dia||10;
+ document.getElementById('editDebtModal').classList.add('open');
+}
+function closeEditDebt(){document.getElementById('editDebtModal').classList.remove('open');editingDebtId=null;}
+function saveDebtEdit(){
+ const d=data.debts.find(x=>x.id===editingDebtId);if(!d)return;
+ const nome=document.getElementById('editDebtName').value.trim();
+ const valor=Number(document.getElementById('editDebtAmount').value),dia=Number(document.getElementById('editDebtDue').value);
+ if(!nome||!Number.isFinite(valor)||Finance.amount(valor)<=0||valor>1e10||!Number.isInteger(dia)||dia<1||dia>31){alert('Confira o nome, o valor e o dia (1 a 31).');return;}
+ const previous=JSON.parse(JSON.stringify(d));
+ // Freeze legacy paid amounts before changing a recurring bill or installment.
+ d.paymentRecords=d.paymentRecords||{};
+ const keys=d.fixa?(d.paidMonths||[]):(d.pagos||[]).map(String);
+ for(const key of keys){if(!d.paymentRecords[key]){const month=d.fixa?key:addMonths(d.inicio,Number(key));d.paymentRecords[key]={date:dateISOForMonthDay(month,d.dia||10),value:Number(d.valor)};}}
+ d.nome=nome;d.valor=Finance.amount(valor);d.dia=dia;
+ if(!save()){Object.keys(d).forEach(k=>delete d[k]);Object.assign(d,previous);return;}
+ closeEditDebt();render();
+}
+function debtValueInMonth(d,month){
+ const key=d.fixa?month:String(debtIndexForMonth(d,month));
+ const record=(d.paymentRecords||{})[key];
+ return debtPaidInMonth(d,month)&&record?Number(record.value):Number(d.valor)||0;
+}
+function orderedDebtList(month){
+ const rank=d=>{
+  const paid=d.pagos||[];
+  if(!d.fixa&&paid.length>=Number(d.meses||1))return 3;
+  if(debtAppliesInMonth(d,month))return debtPaidInMonth(d,month)?1:0;
+  if(!d.fixa&&(d.inicio||month)<month&&paid.length<Number(d.meses||1))return 0;
+  return 2;
+ };
+ return [...data.debts].sort((a,b)=>rank(a)-rank(b)||Number(a.dia||10)-Number(b.dia||10)||String(a.nome).localeCompare(String(b.nome),'pt-BR'));
 }
 
 function creditMonthAmount(cardId,month){return Finance.invoice(data,cardId,month)}
@@ -4356,7 +4398,7 @@ function financeEvents(month=selectedMonth){
   currentMonthDebts(month).forEach(d=>{
     events.push({
       type:'debt',icon:'▦',title:d.nome||'Conta',date:dateISOForMonthDay(month,d.dia||10),
-      value:parseFloat(d.valor)||0,paid:debtPaidInMonth(d,month),
+      value:debtValueInMonth(d,month),paid:debtPaidInMonth(d,month),
       meta:d.fixa?'Conta fixa':'Parcela'
     });
   });
@@ -4741,7 +4783,7 @@ if(typeof dailyQuote!=='undefined'){
     </div>
   </div>`).join('')||'<div class="empty">Nenhum lançamento ainda.</div>';
   const month=selectedMonth;
-  const orderedDebts=[...currentMonthDebts(month), ...(data.debts||[]).filter(d=>!debtAppliesInMonth(d,month))];
+  const orderedDebts=orderedDebtList(month);
   debtList.innerHTML=orderedDebts.map(d=>{
     if(d.dia===undefined) d.dia=10;
     if(d.fixa===undefined) d.fixa=false;
@@ -4793,7 +4835,7 @@ if(typeof dailyQuote!=='undefined'){
     <div class="debtCompactRight">
 
       <div class="debtCompactValue">
-        ${isCurrent ? fmt(d.valor) : '—'}
+        ${isCurrent ? fmt(debtValueInMonth(d,month)) : '—'}
       </div>
 
       <div class="debtStatus ${
@@ -4905,8 +4947,8 @@ if(typeof dailyQuote!=='undefined'){
 
       <button
         class="ghost"
-        onclick="editDebtDay('${d.id}')">
-        ✎ Vencimento
+        onclick="editDebt('${d.id}')">
+        ✎ Editar
       </button>
 
 
