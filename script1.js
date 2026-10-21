@@ -1261,7 +1261,7 @@ function simulatePurchase(){
 }
 
 function render(){
-  renderPayPlan();
+  renderSalaryReceipts();
   const historyBtn=document.getElementById('allMovementsBtn');
   if(historyBtn){historyBtn.hidden=movsInMonth(selectedMonth).length<=5;historyBtn.textContent=showAllMovements?'Mostrar menos':'Ver histórico completo';}
   updateMovMonthInfo();
@@ -1336,9 +1336,8 @@ cardEl.classList.remove('attention');
 
 
   if(typeof quickDebtMonth!=='undefined'){
-    const bills=Finance.obligations(data,selectedMonth);
-    const debtMonth=Finance.amount(bills.reduce((s,r)=>s+Number(r.value),0));
-    const debtPaid=Finance.amount(bills.filter(r=>r.paid).reduce((s,r)=>s+Number(r.value),0));
+    const debtMonth=currentMonthDebtTotal(selectedMonth);
+    const debtPaid=currentMonthDebtPaid(selectedMonth);
     quickDebtMonth.textContent=fmt(debtMonth);
     quickDebtPaid.textContent=fmt(debtPaid);
     quickDebtOpen.textContent=fmt(Math.max(0,debtMonth-debtPaid));
@@ -1772,25 +1771,12 @@ function downloadOriginal(){
  const raw=localStorage.getItem(KEY);if(!raw){alert('Não há dados locais.');return;}
  const blob=new Blob([raw],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='san-dados-originais.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-function payPlanItem(kind,id,index,month){if(kind==='card'){if(invoiceIsPaid(id,month))undoCreditInvoice(id,month);else payCreditInvoice(id,month);}else toggleDebt(id,index,month);}
-function renderPayPlan(){
- const box=document.getElementById('payPlan');if(!box)return;
+function renderSalaryReceipts(){
  const settings=data.paySettings||{};
  for(const day of [5,20]){const el=document.getElementById('salary'+day);if(el&&document.activeElement!==el)el.value=settings['day'+day]||0;}
  const receipts=document.getElementById('salaryReceipts');
  if(receipts)receipts.innerHTML='<h3>Recebimentos</h3><p class="sub">Registre aqui somente salários ainda não lançados.</p>'+[5,20].map(day=>{const received=data.movs.find(m=>m.salaryKey===selectedMonth+'-'+day);return `<button class="ghost" style="margin:8px 8px 0 0" ${received?'disabled':''} onclick="receiveSalary(${day})">${received?'✓ Recebido dia '+day:'Receber salário do dia '+day}</button>`;}).join('');
- const rows=Finance.obligations(data,selectedMonth),next=addMonths(selectedMonth,1);
- const nextEarly=Finance.obligations(data,next).filter(r=>r.month===next&&r.day<5);
- const groups=[{label:'Anteriores e dias 1–4',rows:rows.filter(r=>r.month<selectedMonth||r.day<5)},
- {label:'Dia 5',rows:rows.filter(r=>r.month===selectedMonth&&r.day>=5&&r.day<20)},
- {label:'Dia 20',rows:[...rows.filter(r=>r.month===selectedMonth&&r.day>=20),...nextEarly]}];
- const row=r=>`<div class="item"><div class="itemLeft"><div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${prettyISO(dateISOForMonthDay(r.month,r.day||10))} · ${fmt(r.value)}</div></div></div><button class="ghost" aria-label="${r.paid?'Desmarcar':'Pagar'} ${escapeHtml(r.name)}" onclick="payPlanItem('${r.kind}','${r.id}',${r.index||0},'${r.month}')">${r.paid?'✓ Pago':'Pagar'}</button></div>`;
- box.innerHTML=(storageBlocked?'<p class="red">Dados protegidos. Restaure um backup em Configurações.</p>':'')+'<h3>Contas por pagamento</h3>'+groups.map((g,i)=>{
- const pending=g.rows.filter(r=>!r.paid),paid=g.rows.filter(r=>r.paid);
- if(i===0&&!g.rows.length)return '';
- const open=Finance.amount(pending.reduce((s,r)=>s+Number(r.value),0));
- return `<div class="payGroup"><div class="payGroupTitle"><b>${g.label}</b><strong class="${open?'yellow':'green'}">${open?fmt(open):'✓ Em dia'}</strong></div>${pending.map(row).join('')}${paid.length?`<details class="simpleDetails paidRows"><summary>${paid.length} paga${paid.length===1?'':'s'}</summary>${paid.map(row).join('')}</details>`:''}</div>`;
- }).join('');
+
 }
 
 debtInicio.value=nowMonth(); toggleDebtType(); render(); updateFab();
