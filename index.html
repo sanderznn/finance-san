@@ -1119,6 +1119,18 @@ input::placeholder,textarea::placeholder{
 @keyframes monthFade{from{opacity:0}to{opacity:1}}
 @keyframes monthUp{from{transform:translateY(20px);opacity:.6}to{transform:translateY(0);opacity:1}}
 
+
+.simpleDetails > summary{cursor:pointer;font-size:14px;font-weight:700;padding:8px 0;color:var(--soft);list-style:none;display:flex;align-items:center;justify-content:space-between;min-height:44px}
+.simpleDetails > summary::after{content:'+';font-size:22px}
+.simpleDetails[open] > summary::after{content:'−'}
+.simpleDetails > summary::-webkit-details-marker{display:none}
+.simpleDetails > .card{margin-top:12px}
+.payGroup{padding:16px 0;border-bottom:1px solid var(--line)}
+.payGroup:last-child{border-bottom:0;padding-bottom:0}
+.payGroupTitle{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:15px}
+.paidRows{margin-top:8px}.paidRows .item{opacity:.7}
+#payPlan .item .name{overflow-wrap:anywhere}
+#payPlan .itemLeft{min-width:0}#payPlan .item>button{flex-shrink:0;min-height:44px}
 </style>
 
 <style id="darkfix">
@@ -2578,7 +2590,7 @@ bottom:calc(22px + env(safe-area-inset-bottom));
     <div class="hero homeHeroPro">
   <div class="homeTopLine">
     <div>
-      <div class="kicker">saldo livre real</div>
+      <div class="kicker">Disponível para gastar</div>
       <div id="saldo" class="bigMoney">R$ 0,00</div>
     </div>
   </div>
@@ -2605,6 +2617,7 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </div>
 </div>
 
+<details class="card simpleDetails"><summary>Detalhes do mês</summary>
 <div class="card canSpendCard" id="canSpendCard">
 
   <div class="canSpendTop">
@@ -2727,13 +2740,14 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 
 </div>
 
-    <div id="payPlan" class="card"></div>
+</details>
+<button class="ghost" style="width:100%;margin-bottom:16px" onclick="show('dividas',null)">Ver contas a pagar →</button>
     <div class="lastHeader">
       <div class="title">Últimos lançamentos</div>
       <button class="ghostMiniBtn" onclick="openMovModal()">+ Movimento</button>
     </div>
     <div class="card lastCard">
-      <div id="lastList"></div>
+      <div id="lastList"></div><button id="allMovementsBtn" class="ghost" onclick="showAllMovements=!showAllMovements;render()">Ver histórico completo</button>
     </div>
   </section>
 
@@ -2743,7 +2757,7 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 
   <div class="homeTopLine">
     <div>
-      <div class="kicker">FALTA PAGAR NO MÊS</div>
+      <div class="kicker">FALTA PAGAR</div>
 
       <div id="quickDebtOpen" class="bigMoney bad">
         R$ 0,00
@@ -2768,7 +2782,7 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </div>
 
   <div class="homeStatus">
-    Contas fixas e parcelas do mês selecionado.
+    Contas, parcelas e faturas.
   </div>
 
 </div>
@@ -2795,7 +2809,8 @@ bottom:calc(22px + env(safe-area-inset-bottom));
       <div class="sub" style="margin-top:10px">Use “fixa mensal” para internet, aluguel, academia etc. Ela não entra como dívida total; só aparece como conta do mês.</div>
       </div>
     </div>
-    <div id="debtList"></div>
+    <div id="payPlan" class="card"></div>
+<details class="card simpleDetails"><summary>Gerenciar contas e parcelas</summary><div id="debtList"></div></details>
   </section>
 
   <section id="video" class="section">
@@ -2972,6 +2987,7 @@ bottom:calc(22px + env(safe-area-inset-bottom));
     <div id="wishList" class="wishGrid"></div>
   </section>
   <section id="config" class="section">
+<div id="salaryReceipts" class="card"></div>
 <div class="card"><h3>Planejamento e saldo</h3><p class="sub">Configure os salários previstos. Eles só entram no saldo quando você marcar o recebimento.</p><label>Salário do dia 5<input id="salary5" type="number" min="0" step="0.01"></label><label>Salário do dia 20<input id="salary20" type="number" min="0" step="0.01"></label><button class="primary" onclick="savePaySettings()">SALVAR SALÁRIOS</button><button class="ghost" onclick="reconcileBalance()">Conferir saldo real</button><p class="sub">O saldo real deve incluir o dinheiro separado nas metas. As metas são descontadas apenas do disponível para gastar.</p><button class="ghost" onclick="downloadOriginal()">Baixar dados locais originais</button></div>
     <div class="title">Configurações</div>
 
@@ -3287,6 +3303,7 @@ data=repairData(data);
 try{const original=localStorage.getItem(KEY);if(original&&!localStorage.getItem(KEY+'_beforeV7'))localStorage.setItem(KEY+'_beforeV7',original);}catch(e){}
 save();
 let tipo='gasto';
+let showAllMovements=false;
 let selectedMonth=nowMonth();
 try{const savedMonth=localStorage.getItem(KEY+'_selectedMonth');if(validMonth(savedMonth))selectedMonth=savedMonth;}catch(e){}
 function rememberMonth(){try{localStorage.setItem(KEY+'_selectedMonth',selectedMonth)}catch(e){}}
@@ -4533,6 +4550,8 @@ function simulatePurchase(){
 
 function render(){
   renderPayPlan();
+  const historyBtn=document.getElementById('allMovementsBtn');
+  if(historyBtn){historyBtn.hidden=movsInMonth(selectedMonth).length<=5;historyBtn.textContent=showAllMovements?'Mostrar menos':'Ver histórico completo';}
   updateMovMonthInfo();
   if(!data.creditCards) data.creditCards=[]; if(!data.creditPurchases) data.creditPurchases=[];
   monthLabel.textContent=monthLabelSmart(selectedMonth);
@@ -4605,8 +4624,9 @@ cardEl.classList.remove('attention');
 
 
   if(typeof quickDebtMonth!=='undefined'){
-    const debtMonth=currentMonthDebtTotal(selectedMonth);
-    const debtPaid=currentMonthDebtPaid(selectedMonth);
+    const bills=Finance.obligations(data,selectedMonth);
+    const debtMonth=Finance.amount(bills.reduce((s,r)=>s+Number(r.value),0));
+    const debtPaid=Finance.amount(bills.filter(r=>r.paid).reduce((s,r)=>s+Number(r.value),0));
     quickDebtMonth.textContent=fmt(debtMonth);
     quickDebtPaid.textContent=fmt(debtPaid);
     quickDebtOpen.textContent=fmt(Math.max(0,debtMonth-debtPaid));
@@ -4704,15 +4724,15 @@ if(commitmentFooterEl){
 
 if(typeof homeStatus!=='undefined'){
   homeStatus.textContent=proj.safe>=0
-    ? `Depois de reservar todas as contas, você possui ${fmt(proj.safe)} realmente livres.`
-    : `Seu saldo atual não cobre ${fmt(Math.abs(proj.safe))} dos compromissos deste mês.`;
+    ? 'Contas e metas já descontadas.'
+    : `Faltam ${fmt(Math.abs(proj.safe))} para cobrir as contas.`;
 }
 
 if(typeof dailyQuote!=='undefined'){
   dailyQuote.textContent=buildHomeInsight(proj);
 }
 
-  lastList.innerHTML=movsInMonth(selectedMonth).map(m=>`<div class="item">
+  lastList.innerHTML=movsInMonth(selectedMonth).slice(0,showAllMovements?undefined:5).map(m=>`<div class="item">
     <div class="itemLeft">
       <div class="icon">${escapeHtml(String(m.cat||'🎯').split(' ')[0])}</div>
       <div>
@@ -5045,19 +5065,20 @@ function renderPayPlan(){
  const box=document.getElementById('payPlan');if(!box)return;
  const settings=data.paySettings||{};
  for(const day of [5,20]){const el=document.getElementById('salary'+day);if(el&&document.activeElement!==el)el.value=settings['day'+day]||0;}
- const rows=Finance.obligations(data,selectedMonth);
- const next=addMonths(selectedMonth,1);
+ const receipts=document.getElementById('salaryReceipts');
+ if(receipts)receipts.innerHTML='<h3>Recebimentos</h3><p class="sub">Registre aqui somente salários ainda não lançados.</p>'+[5,20].map(day=>{const received=data.movs.find(m=>m.salaryKey===selectedMonth+'-'+day);return `<button class="ghost" style="margin:8px 8px 0 0" ${received?'disabled':''} onclick="receiveSalary(${day})">${received?'✓ Recebido dia '+day:'Receber salário do dia '+day}</button>`;}).join('');
+ const rows=Finance.obligations(data,selectedMonth),next=addMonths(selectedMonth,1);
  const nextEarly=Finance.obligations(data,next).filter(r=>r.month===next&&r.day<5);
  const groups=[{label:'Anteriores e dias 1–4',rows:rows.filter(r=>r.month<selectedMonth||r.day<5)},
- {label:'Pagamento do dia 5',day:5,rows:rows.filter(r=>r.month===selectedMonth&&r.day>=5&&r.day<20)},
- {label:'Pagamento do dia 20',day:20,rows:[...rows.filter(r=>r.month===selectedMonth&&r.day>=20),...nextEarly]}];
- box.innerHTML=(storageBlocked?'<p class="red">Gravação bloqueada: seus dados originais foram preservados. Restaure um backup em Configurações.</p>':'')+'<h3>Planejamento • dias 5 e 20</h3><p class="sub">Previsto não é saldo. Confira os recebimentos já lançados antes de registrar o salário aqui.</p>'+groups.map(g=>{
- const open=Finance.amount(g.rows.filter(r=>!r.paid).reduce((s,r)=>s+Number(r.value),0));
- const received=g.day&&data.movs.find(m=>m.salaryKey===selectedMonth+'-'+g.day),income=Number(settings['day'+g.day]||0);
- const heading=`<div style="margin-top:16px"><b>${g.label}</b><div class="sub">Em aberto: ${fmt(open)}${g.day?' • salário previsto: '+fmt(income):''}</div>`;
- const salary=g.day?`<button class="ghost" ${received?'disabled':''} onclick="receiveSalary(${g.day})">${received?'✓ Salário registrado: '+fmt(received.valor):'Registrar recebimento'}</button>`:'';
- return heading+salary+g.rows.map(r=>`<div class="item"><div class="itemLeft"><div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${prettyISO(dateISOForMonthDay(r.month,r.day||10))} • ${monthName(r.month)} • ${fmt(r.value)}</div></div></div><button class="ghost" onclick="payPlanItem('${r.kind}','${r.id}',${r.index||0},'${r.month}')">${r.paid?'✓ Pago':'Pagar'}</button></div>`).join('')+(!g.rows.length?'<p class="sub">Nenhuma conta cadastrada neste período.</p>':'')+'</div>';
- }).join('')+'<p class="sub">Configure os salários em Configurações. Contas dos dias 1 a 4 entram no planejamento do dia 20 do mês anterior.</p>';
+ {label:'Dia 5',rows:rows.filter(r=>r.month===selectedMonth&&r.day>=5&&r.day<20)},
+ {label:'Dia 20',rows:[...rows.filter(r=>r.month===selectedMonth&&r.day>=20),...nextEarly]}];
+ const row=r=>`<div class="item"><div class="itemLeft"><div><div class="name">${escapeHtml(r.name)}</div><div class="sub">${prettyISO(dateISOForMonthDay(r.month,r.day||10))} · ${fmt(r.value)}</div></div></div><button class="ghost" aria-label="${r.paid?'Desmarcar':'Pagar'} ${escapeHtml(r.name)}" onclick="payPlanItem('${r.kind}','${r.id}',${r.index||0},'${r.month}')">${r.paid?'✓ Pago':'Pagar'}</button></div>`;
+ box.innerHTML=(storageBlocked?'<p class="red">Dados protegidos. Restaure um backup em Configurações.</p>':'')+'<h3>Contas por pagamento</h3>'+groups.map((g,i)=>{
+ const pending=g.rows.filter(r=>!r.paid),paid=g.rows.filter(r=>r.paid);
+ if(i===0&&!g.rows.length)return '';
+ const open=Finance.amount(pending.reduce((s,r)=>s+Number(r.value),0));
+ return `<div class="payGroup"><div class="payGroupTitle"><b>${g.label}</b><strong class="${open?'yellow':'green'}">${open?fmt(open):'✓ Em dia'}</strong></div>${pending.map(row).join('')}${paid.length?`<details class="simpleDetails paidRows"><summary>${paid.length} paga${paid.length===1?'':'s'}</summary>${paid.map(row).join('')}</details>`:''}</div>`;
+ }).join('');
 }
 
 debtInicio.value=nowMonth(); toggleDebtType(); render(); updateFab();

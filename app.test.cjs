@@ -8,7 +8,7 @@ function app(raw){
  const alerts=[],prompts=[];
  const ctx={console,Date,Math,JSON,Number,String,Array,Object,Set,Map,RegExp,Blob,URL,Promise,parseFloat,parseInt,confirm:()=>true,prompt:()=>prompts.shift()??null,alert:m=>alerts.push(m),setTimeout:()=>0,clearTimeout(){},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},navigator:{},document:{activeElement:null,body:node('body'),createElement:()=>node('new'),getElementById:node,querySelector:s=>s==='.section.active'?node('home'):null,querySelectorAll:()=>[],addEventListener(){}},addEventListener(){},...nodes};ctx.window=ctx;vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/finance-core.js','utf8'),ctx);for(const s of scripts)vm.runInContext(s,ctx);return {ctx,storage,alerts,prompts,run:s=>vm.runInContext(s,ctx)};
 }
-let a=app();assert.equal(a.run('totals().saldo'),0);assert.match(a.ctx.payPlan.innerHTML,/dia 5/);
+let a=app();assert.equal(a.run('totals().saldo'),0);assert.match(a.ctx.payPlan.innerHTML,/Dia 5/);
 a.run("salary5.value='1000';salary20.value='800';savePaySettings()");a.prompts.push('1000','2026-10-05');a.run("selectedMonth='2026-10';receiveSalary(5)");assert.equal(a.run("totals('2026-10').saldo"),1000);a.run('receiveSalary(5)');assert.equal(a.run('data.movs.length'),1);
 a.run("data.wishes=[{id:'w',nome:'Meta',valor:300,guardado:200}];render()");assert.equal(a.run("projectionForMonth('2026-10').safe"),800);
 a.run("movNome.value='Teste';movValor.value='-10';addMov()");assert.equal(a.run('data.movs.length'),1);
