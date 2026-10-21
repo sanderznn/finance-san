@@ -33,3 +33,7 @@ node app.test.cjs
 ```
 
 Os testes cobrem saldo acumulado, datas de recebimento/pagamento, centavos, cartão sem pagamento, diferença de fatura, atrasos, reservas, recebimento de salário sem duplicação, restauração e bloqueio de dados corrompidos. O teste dos controladores usa uma simulação mínima do DOM, não valida layout, Safari ou interação real de toque. É necessário conferir a atualização no aparelho.
+
+## Dashboard
+
+Mostra entradas e saídas registradas, resultado do mês (não o saldo acumulado), até quatro grupos de categorias de saídas e histórico dos últimos seis meses. Faturas aparecem como saídas no pagamento, sem duplicar compras. A comparação usa o mês anterior inteiro; no mês atual ela é identificada como parcial. Histórico e calendário ficam recolhidos.

@@ -1725,23 +1725,7 @@ if(typeof dailyQuote!=='undefined'){
       </div>
     </div>`
   }).join('')}</div>`:'<div class="empty">Nenhum job cadastrado ainda.</div>';
-  const bars=[['Entrou',t.entrada],['Saiu',t.saida],['Jobs',paidJobs+pendJobs],['Dívidas',t.totalDividas]];
-  const max=Math.max(...bars.map(b=>b[1]),1);
-  chart.innerHTML=bars.map(b=>`<div class="barWrap"><div class="bar" style="height:${proportionalHeightDashboard(b[1],max)}px"></div><div class="barLabel">${b[0]}</div><div class="barLabel">${fmt(b[1])}</div></div>`).join('');
-  const debtRestante=(data.debts||[]).filter(d=>!d.fixa).reduce((a,d)=>a+Math.max(0,(parseInt(d.meses)||1)-(d.pagos||[]).length)*(parseFloat(d.valor)||0),0);
-  const wishGuardado=data.wishes.reduce((a,w)=>a+w.guardado,0);
-  const jobsTotal=paidJobs+pendJobs;
-  dashSaldo.textContent=fmt(t.saldo); dashSaida.textContent=fmt(t.saida); dashDebt.textContent=fmt(debtRestante); dashWish.textContent=fmt(wishGuardado);
-  const score=Math.max(0,Math.min(100,Math.round(100-(t.saida/Math.max(t.entrada,1))*100)));
-  dashScore.textContent=score+'%';
-  dashScoreBar.style.width=score+'%';
-  const scoreColor=score>=55?'#35f477':score>=25?'#e5c36a':'#ff5265';
-  dashScoreBar.style.background=scoreColor;
-  scoreCircle.style.background=`conic-gradient(${scoreColor} 0deg, ${scoreColor} ${score*3.6}deg, rgba(255,255,255,.10) ${score*3.6}deg 360deg)`;
-  let statusMsg=score>=55?'Seu mês está respirando. Mantém o controle.':score>=25?'Atenção: seu dinheiro está ficando apertado.':'Alerta: segura gastos novos e prioriza quitar contas.';
-  let debtMsg=debtRestante>0?`Você ainda tem ${fmt(debtRestante)} em dívidas futuras.`:'Você não tem dívida futura cadastrada.';
-  let jobMsg=jobsTotal>0?`Sua área videomaker tem ${fmt(jobsTotal)} em jobs cadastrados.`:'Cadastre seus jobs para enxergar sua renda de videomaker.';
-  dashInsights.innerHTML=`<div class="insight"><div class="insightIcon">🎬</div><div class="insightText"><b>Status:</b> ${statusMsg}</div></div><div class="insight"><div class="insightIcon">💳</div><div class="insightText"><b>Dívidas:</b> ${debtMsg}</div></div><div class="insight"><div class="insightIcon">📱</div><div class="insightText"><b>Jobs:</b> ${jobMsg}</div></div>`;
+  renderDashboard();
   renderFinanceCalendar();
   renderCreditCards();
   if(typeof quickWishCount!=='undefined'){
@@ -1802,6 +1786,29 @@ function withdrawWish(id){
 function downloadOriginal(){
  const raw=localStorage.getItem(KEY);if(!raw){alert('Não há dados locais.');return;}
  const blob=new Blob([raw],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='san-dados-originais.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function dashboardCategories(month){
+ const sums=new Map();
+ for(const m of movsInMonth(month).filter(m=>m.tipo==='gasto')){const key=m.cat||'Outros';sums.set(key,(sums.get(key)||0)+Finance.cents(m.valor));}
+ const paid=Finance.cents(totals(month).dividasPagas);if(paid)sums.set('Contas e parcelas',(sums.get('Contas e parcelas')||0)+paid);
+ const sorted=[...sums].filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+ if(sorted.length>4)return [...sorted.slice(0,3),['Demais categorias',sorted.slice(3).reduce((s,[,v])=>s+v,0)]];
+ return sorted;
+}
+function renderDashboard(){
+ const t=totals(selectedMonth),previous=totals(addMonths(selectedMonth,-1));
+ document.getElementById('dashPeriod').textContent=monthName(selectedMonth);
+ const result=document.getElementById('dashResult');result.textContent=fmt(t.resultado);result.className='bigMoney '+(t.resultado<0?'red':'green');
+ document.getElementById('dashIncome').textContent=fmt(t.entrada);
+ document.getElementById('dashExpense').textContent=fmt(t.saida);
+ const difference=Finance.amount(t.saida-previous.saida);
+ document.getElementById('dashComparison').textContent=previous.entrada===0&&previous.saida===0?'Sem movimentações no mês anterior.':
+  (selectedMonth===nowMonth()?'Até agora: ':'')+(difference===0?'mesmo total de saídas do mês anterior.':fmt(Math.abs(difference))+(difference>0?' a mais':' a menos')+' em saídas que no mês anterior inteiro.');
+ const categories=dashboardCategories(selectedMonth),max=Math.max(1,...categories.map(([,v])=>v));
+ document.getElementById('dashCategories').innerHTML=categories.length?categories.map(([name,value])=>`<div class="expenseCategory"><div class="expenseCategoryTop"><span>${escapeHtml(name)}</span><b>${fmt(value/100)}</b></div><div class="expenseTrack"><div style="width:${value/max*100}%"></div></div></div>`).join(''):'<div class="empty">Nenhuma saída neste mês.</div>';
+ const months=Array.from({length:6},(_,i)=>{const month=addMonths(selectedMonth,i-5);return {month,...totals(month)};});
+ const scale=Math.max(1,...months.flatMap(m=>[m.entrada,m.saida]));
+ document.getElementById('dashHistory').innerHTML=months.map(m=>`<div class="historyMonth"><b>${monthName(m.month)}</b><div class="historyNumbers"><span class="green">${fmt(m.entrada)}</span><span class="red">${fmt(m.saida)}</span></div><div class="expenseTrack"><div style="background:var(--green);width:${m.entrada/scale*100}%"></div></div><div class="expenseTrack"><div style="background:var(--red);width:${m.saida/scale*100}%"></div></div></div>`).join('');
 }
 function renderSalaryReceipts(){
  const settings=data.paySettings||{};

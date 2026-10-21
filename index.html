@@ -1125,6 +1125,18 @@ input::placeholder,textarea::placeholder{
 .simpleDetails[open] > summary::after{content:'−'}
 .simpleDetails > summary::-webkit-details-marker{display:none}
 .simpleDetails > .card{margin-top:12px}
+
+#dash .dashValue{font-size:clamp(16px,4.6vw,23px);overflow-wrap:anywhere}
+#dash .dashBox{min-width:0;padding:14px 10px}
+.expenseCategory{margin-top:20px}
+.expenseCategoryTop{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.expenseCategoryTop span{min-width:0;overflow-wrap:anywhere;color:var(--soft)}
+.expenseCategoryTop b{white-space:nowrap}
+.expenseTrack{height:6px;background:rgba(255,255,255,.08);border-radius:8px;margin-top:8px;overflow:hidden}
+.expenseTrack>div{height:100%;border-radius:8px;background:var(--yellow)}
+.historyMonth{padding:16px 0;border-bottom:1px solid var(--line);font-size:13px}
+.historyMonth:last-child{border:0}
+.historyNumbers{display:flex;justify-content:space-between;gap:10px;margin-top:8px;flex-wrap:wrap}
 </style>
 
 <style id="darkfix">
@@ -2857,61 +2869,23 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </section>
 
   <section id="dash" class="section">
-    <div class="sectionHeader">
-      <div class="eyebrow">visão geral</div>
-      <h2>Dashboard</h2>
-      <p>Um painel rápido para você entender seu mês, controlar dívidas, jobs e metas sem se perder.</p>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">📊 Resumo financeiro</div>
-      <div class="dashboardGrid">
-        <div class="dashBox">
-          <div class="dashLabel">saldo livre</div>
-          <div class="dashValue" id="dashSaldo">R$ 0</div>
-          <div class="dashHint">quanto ainda sobra hoje</div>
-        </div>
-        <div class="dashBox">
-          <div class="dashLabel">saída total</div>
-          <div class="dashValue red" id="dashSaida">R$ 0</div>
-          <div class="dashHint">gastos + parcelas pagas</div>
-        </div>
-        <div class="dashBox">
-          <div class="dashLabel">dívidas faltam</div>
-          <div class="dashValue yellow" id="dashDebt">R$ 0</div>
-          <div class="dashHint">restante para quitar</div>
-        </div>
-        <div class="dashBox">
-          <div class="dashLabel">metas guardado</div>
-          <div class="dashValue green" id="dashWish">R$ 0</div>
-          <div class="dashHint">dinheiro nos desejos</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">🎯 Nota do mês</div>
-      <div class="scoreCircle" id="scoreCircle"><span id="dashScore">0%</span></div>
-      <div class="progressBg"><div id="dashScoreBar" class="progressFill" style="width:0%;background:#35f477"></div></div>
-      <div class="insightList" id="dashInsights"></div>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">Agenda do mês</div>
-      <div class="agendaToolbar">
-        <button class="ghost" type="button" onclick="exportCalendarICS()">Adicionar ao Calendário</button>
-      </div>
-      <div class="sub">Amarelo = contas • vermelho = cartão • azul = jobs</div>
-      <div id="financeCalendar" class="calendar"></div>
-      <div id="agendaList" class="agendaList"></div>
-    </div>
-
-    <div class="card">
-      <div class="cardTitle">📊 Comparativo</div>
-      <div class="chart" id="chart"></div>
-    </div>
-  </section>
-
+ <div class="sectionHeader"><div class="eyebrow" id="dashPeriod"></div><h2>Seu mês</h2></div>
+ <div class="card">
+  <div class="dashLabel">Resultado do mês</div><div class="bigMoney" id="dashResult">R$ 0</div>
+  <div class="sub">Entradas menos saídas</div>
+  <div class="dashboardGrid" style="margin-top:18px;grid-template-columns:1fr 1fr">
+   <div class="dashBox"><div class="dashLabel">Entrou</div><div class="dashValue green" id="dashIncome">R$ 0</div></div>
+   <div class="dashBox"><div class="dashLabel">Saiu</div><div class="dashValue red" id="dashExpense">R$ 0</div></div>
+  </div><p class="sub" id="dashComparison" style="margin-top:12px"></p>
+ </div>
+ <div class="card"><div class="cardTitle">Para onde foi o dinheiro</div><div id="dashCategories"></div></div>
+ <details class="card simpleDetails"><summary>Últimos 6 meses</summary><div class="sub">Verde: entradas · vermelho: saídas</div><div id="dashHistory"></div></details>
+ <details class="card simpleDetails"><summary>Calendário do mês</summary>
+  <div class="agendaToolbar"><button class="ghost" type="button" onclick="exportCalendarICS()">Adicionar ao Calendário</button></div>
+  <div class="sub">Amarelo: contas · vermelho: cartão · azul: jobs</div>
+  <div id="financeCalendar" class="calendar"></div><div id="agendaList" class="agendaList"></div>
+ </details>
+ </section>
 
   <section id="cartao" class="section">
     <div class="title">Cartão de crédito</div>
@@ -5016,23 +4990,7 @@ if(typeof dailyQuote!=='undefined'){
       </div>
     </div>`
   }).join('')}</div>`:'<div class="empty">Nenhum job cadastrado ainda.</div>';
-  const bars=[['Entrou',t.entrada],['Saiu',t.saida],['Jobs',paidJobs+pendJobs],['Dívidas',t.totalDividas]];
-  const max=Math.max(...bars.map(b=>b[1]),1);
-  chart.innerHTML=bars.map(b=>`<div class="barWrap"><div class="bar" style="height:${proportionalHeightDashboard(b[1],max)}px"></div><div class="barLabel">${b[0]}</div><div class="barLabel">${fmt(b[1])}</div></div>`).join('');
-  const debtRestante=(data.debts||[]).filter(d=>!d.fixa).reduce((a,d)=>a+Math.max(0,(parseInt(d.meses)||1)-(d.pagos||[]).length)*(parseFloat(d.valor)||0),0);
-  const wishGuardado=data.wishes.reduce((a,w)=>a+w.guardado,0);
-  const jobsTotal=paidJobs+pendJobs;
-  dashSaldo.textContent=fmt(t.saldo); dashSaida.textContent=fmt(t.saida); dashDebt.textContent=fmt(debtRestante); dashWish.textContent=fmt(wishGuardado);
-  const score=Math.max(0,Math.min(100,Math.round(100-(t.saida/Math.max(t.entrada,1))*100)));
-  dashScore.textContent=score+'%';
-  dashScoreBar.style.width=score+'%';
-  const scoreColor=score>=55?'#35f477':score>=25?'#e5c36a':'#ff5265';
-  dashScoreBar.style.background=scoreColor;
-  scoreCircle.style.background=`conic-gradient(${scoreColor} 0deg, ${scoreColor} ${score*3.6}deg, rgba(255,255,255,.10) ${score*3.6}deg 360deg)`;
-  let statusMsg=score>=55?'Seu mês está respirando. Mantém o controle.':score>=25?'Atenção: seu dinheiro está ficando apertado.':'Alerta: segura gastos novos e prioriza quitar contas.';
-  let debtMsg=debtRestante>0?`Você ainda tem ${fmt(debtRestante)} em dívidas futuras.`:'Você não tem dívida futura cadastrada.';
-  let jobMsg=jobsTotal>0?`Sua área videomaker tem ${fmt(jobsTotal)} em jobs cadastrados.`:'Cadastre seus jobs para enxergar sua renda de videomaker.';
-  dashInsights.innerHTML=`<div class="insight"><div class="insightIcon">🎬</div><div class="insightText"><b>Status:</b> ${statusMsg}</div></div><div class="insight"><div class="insightIcon">💳</div><div class="insightText"><b>Dívidas:</b> ${debtMsg}</div></div><div class="insight"><div class="insightIcon">📱</div><div class="insightText"><b>Jobs:</b> ${jobMsg}</div></div>`;
+  renderDashboard();
   renderFinanceCalendar();
   renderCreditCards();
   if(typeof quickWishCount!=='undefined'){
@@ -5093,6 +5051,29 @@ function withdrawWish(id){
 function downloadOriginal(){
  const raw=localStorage.getItem(KEY);if(!raw){alert('Não há dados locais.');return;}
  const blob=new Blob([raw],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='san-dados-originais.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function dashboardCategories(month){
+ const sums=new Map();
+ for(const m of movsInMonth(month).filter(m=>m.tipo==='gasto')){const key=m.cat||'Outros';sums.set(key,(sums.get(key)||0)+Finance.cents(m.valor));}
+ const paid=Finance.cents(totals(month).dividasPagas);if(paid)sums.set('Contas e parcelas',(sums.get('Contas e parcelas')||0)+paid);
+ const sorted=[...sums].filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+ if(sorted.length>4)return [...sorted.slice(0,3),['Demais categorias',sorted.slice(3).reduce((s,[,v])=>s+v,0)]];
+ return sorted;
+}
+function renderDashboard(){
+ const t=totals(selectedMonth),previous=totals(addMonths(selectedMonth,-1));
+ document.getElementById('dashPeriod').textContent=monthName(selectedMonth);
+ const result=document.getElementById('dashResult');result.textContent=fmt(t.resultado);result.className='bigMoney '+(t.resultado<0?'red':'green');
+ document.getElementById('dashIncome').textContent=fmt(t.entrada);
+ document.getElementById('dashExpense').textContent=fmt(t.saida);
+ const difference=Finance.amount(t.saida-previous.saida);
+ document.getElementById('dashComparison').textContent=previous.entrada===0&&previous.saida===0?'Sem movimentações no mês anterior.':
+  (selectedMonth===nowMonth()?'Até agora: ':'')+(difference===0?'mesmo total de saídas do mês anterior.':fmt(Math.abs(difference))+(difference>0?' a mais':' a menos')+' em saídas que no mês anterior inteiro.');
+ const categories=dashboardCategories(selectedMonth),max=Math.max(1,...categories.map(([,v])=>v));
+ document.getElementById('dashCategories').innerHTML=categories.length?categories.map(([name,value])=>`<div class="expenseCategory"><div class="expenseCategoryTop"><span>${escapeHtml(name)}</span><b>${fmt(value/100)}</b></div><div class="expenseTrack"><div style="width:${value/max*100}%"></div></div></div>`).join(''):'<div class="empty">Nenhuma saída neste mês.</div>';
+ const months=Array.from({length:6},(_,i)=>{const month=addMonths(selectedMonth,i-5);return {month,...totals(month)};});
+ const scale=Math.max(1,...months.flatMap(m=>[m.entrada,m.saida]));
+ document.getElementById('dashHistory').innerHTML=months.map(m=>`<div class="historyMonth"><b>${monthName(m.month)}</b><div class="historyNumbers"><span class="green">${fmt(m.entrada)}</span><span class="red">${fmt(m.saida)}</span></div><div class="expenseTrack"><div style="background:var(--green);width:${m.entrada/scale*100}%"></div></div><div class="expenseTrack"><div style="background:var(--red);width:${m.saida/scale*100}%"></div></div></div>`).join('');
 }
 function renderSalaryReceipts(){
  const settings=data.paySettings||{};
