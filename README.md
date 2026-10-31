@@ -8,6 +8,7 @@ Aplicativo pessoal em português, com armazenamento local no navegador. A versã
 - Em Configurações → Recebimentos, registre cada salário quando acontecer. Se já o lançou manualmente, remova o lançamento duplicado antes de registrar pelo planejamento.
 - Abra uma conta e toque em Editar para alterar nome, valor e vencimento. Valores já pagos são preservados; a lista prioriza pendentes, depois pagas, futuras e quitadas.
 - A aba Dívidas mantém uma única lista de contas, com valor, vencimento, parcelas e status pago/pendente. Faturas são gerenciadas na aba Cartões.
+- Em Dívidas, use Todas, Dia 5 ou Dia 20 para filtrar pelo vencimento. O resumo acompanha o filtro; saldo e projeções gerais continuam considerando todas as contas.
 - Ao pagar contas, faturas ou receber jobs, informe a data real. O mês do evento ou do vencimento não determina o mês de caixa.
 - Saldo acumulado inclui entradas e saídas dos meses anteriores. Confira o total em Configurações → Conferir saldo real se seu histórico anterior estiver incompleto.
 - Metas representam dinheiro já incluído no saldo total. Esse valor fica separado do disponível para gastar; retirar uma reserva apenas libera o valor, sem criar entrada de dinheiro.

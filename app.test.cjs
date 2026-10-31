@@ -2,7 +2,7 @@ const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/st
 const html=fs.readFileSync(__dirname+'/index.html','utf8');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
 function app(raw){
- const nodes={};function node(id){return nodes[id]||(nodes[id]={id,value:'',innerHTML:'',textContent:'',className:'',style:{},options:[],files:[],classList:{add(){},remove(){},toggle(){}},appendChild(){},remove(){},click(){},querySelector(){return null},querySelectorAll(){return []}})}
+ const nodes={};function node(id){return nodes[id]||(nodes[id]={id,value:'',innerHTML:'',textContent:'',className:'',style:{},options:[],files:[],attributes:{},setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},classList:{add(){},remove(){},toggle(){}},appendChild(){},remove(){},click(){},querySelector(){return null},querySelectorAll(){return []}})}
  for(const m of html.matchAll(/\bid="([^"]+)"/g))node(m[1]);
  const storage=new Map();if(raw!==undefined)storage.set('sanFinancePro_v6_fixas',raw);
  const alerts=[],prompts=[];
@@ -30,3 +30,42 @@ console.log('PASS: editing preserves legacy payments; invalid input and cancella
 a=app();a.run("selectedMonth='2026-10';data.movs=[{id:'old',tipo:'entrada',valor:1000,ym:'2026-09'},{id:'in',tipo:'entrada',valor:500,ym:'2026-10'},{id:'out',tipo:'gasto',valor:50,ym:'2026-10',cat:'Alimentação'}];data.debts=[{id:'d',nome:'Conta',fixa:true,valor:70,inicio:'2026-10',paidMonths:['2026-10'],pagos:[],dia:20}];render()");
 assert.equal(a.ctx.dashResult.textContent,'R$ 380,00');assert.equal(a.ctx.dashIncome.textContent,'R$ 500,00');assert.equal(a.ctx.dashExpense.textContent,'R$ 120,00');assert.equal(a.run("dashboardCategories(selectedMonth).reduce((s,x)=>s+x[1],0)"),12000);assert.equal(a.run("totals(selectedMonth).saldo"),1380);
 console.log('PASS: dashboard monthly result excludes carryover; category totals match paid outflows');
+
+// Filtering by due day must only change the debt view, including its summary.
+a=app();a.run(`selectedMonth='2026-10';data.debts=[
+ {id:'five',nome:'Parcela cinco',valor:67.8,dia:'05',fixa:false,meses:3,inicio:'2026-10',pagos:[]},
+ {id:'fivePaid',nome:'Paga cinco',valor:60,dia:5,fixa:true,meses:1,inicio:'2026-10',pagos:[],paidMonths:['2026-10'],paymentRecords:{'2026-10':{date:'2026-11-01',value:40}}},
+ {id:'twenty',nome:'Academia vinte',valor:79.9,dia:'20',fixa:true,meses:1,inicio:'2026-10',pagos:[],paidMonths:[]},
+ {id:'twentyPaid',nome:'Paga vinte',valor:100,dia:20,fixa:false,meses:1,inicio:'2026-10',pagos:[0],paymentRecords:{'0':{date:'2026-10-20',value:87}}},
+ {id:'other',nome:'Outro vencimento',valor:12.3,dia:10,fixa:true,meses:1,inicio:'2026-10',pagos:[],paidMonths:[]},
+ {id:'future',nome:'Futura cinco',valor:20,dia:5,fixa:false,meses:1,inicio:'2026-11',pagos:[]},
+ {id:'settled',nome:'Quitada cinco',valor:25,dia:5,fixa:false,meses:1,inicio:'2026-09',pagos:[0]}
+];render()`);
+const unfilteredData=a.run('JSON.stringify(data)'),unfilteredTotals=a.run('JSON.stringify(totals())'),unfilteredProjection=a.run('JSON.stringify(projectionForMonth())');
+assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 287,00');
+assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 127,00');
+assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 160,00');
+a.run('setDebtDayFilter(5)');
+assert.match(a.ctx.debtList.innerHTML,/Parcela cinco/);assert.match(a.ctx.debtList.innerHTML,/Paga cinco/);
+assert.doesNotMatch(a.ctx.debtList.innerHTML,/Academia vinte|Paga vinte|Outro vencimento/);
+assert.ok(a.ctx.debtList.innerHTML.indexOf('Parcela cinco')<a.ctx.debtList.innerHTML.indexOf('Paga cinco'));
+assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 107,80');assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 40,00');assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 67,80');
+assert.equal(a.ctx.debtTotalLabel.textContent,'TOTAL DO DIA 5');assert.equal(a.ctx.debtFilter5.getAttribute('aria-pressed'),'true');assert.match(a.ctx.debtFilter5.className,/active/);
+assert.equal(a.ctx.debtFilterAll.getAttribute('aria-pressed'),'false');assert.equal(a.ctx.debtFilter20.getAttribute('aria-pressed'),'false');
+a.run("setDebtDayFilter('20')");
+assert.match(a.ctx.debtList.innerHTML,/Academia vinte/);assert.match(a.ctx.debtList.innerHTML,/Paga vinte/);assert.doesNotMatch(a.ctx.debtList.innerHTML,/Parcela cinco|Paga cinco|Outro vencimento/);
+assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 166,90');assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 87,00');assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 79,90');
+assert.equal(a.ctx.debtFilter5.getAttribute('aria-pressed'),'false');assert.equal(a.ctx.debtFilter20.getAttribute('aria-pressed'),'true');
+a.run("setDebtDayFilter('all')");assert.match(a.ctx.debtList.innerHTML,/Outro vencimento/);assert.equal(a.ctx.debtTotalLabel.textContent,'TOTAL DO MÊS');assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 287,00');
+a.run("setDebtDayFilter('10')");assert.equal(a.run('debtDayFilter'),'all');
+assert.equal(a.run('JSON.stringify(data)'),unfilteredData);assert.equal(a.run('JSON.stringify(totals())'),unfilteredTotals);assert.equal(a.run('JSON.stringify(projectionForMonth())'),unfilteredProjection);
+a.run("setDebtDayFilter('5')");a.prompts.push('2026-10-05');a.run("toggleDebt('five',0)");
+assert.equal(a.run('debtDayFilter'),'5');assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 107,80');assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 0,00');assert.equal(a.run('totals().saida'),154.8);
+a.run("toggleDebt('five',0)");assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 67,80');
+a.run("editDebt('twenty');editDebtDue.value='5';saveDebtEdit()");assert.match(a.ctx.debtList.innerHTML,/Academia vinte/);
+a.run("setDebtDayFilter('20')");assert.doesNotMatch(a.ctx.debtList.innerHTML,/Academia vinte/);assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 0,00');
+a.run("setSelectedMonth('2026-11');setDebtDayFilter('5')");assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 227,70');assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 0,00');
+a=app();a.run("selectedMonth='2026-10';data.debts=[{id:'only5',nome:'Conta cinco',valor:10,dia:5,fixa:true,meses:1,inicio:'2026-10',pagos:[],paidMonths:[]}];setDebtDayFilter('20')");
+assert.match(a.ctx.debtList.innerHTML,/Nenhuma conta com vencimento no dia 20/);assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 0,00');assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 0,00');assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 0,00');
+a.run("setDebtDayFilter('all')");assert.match(a.ctx.debtList.innerHTML,/Conta cinco/);
+console.log('PASS: due-day filters and accessible button state; matching summaries; all accounts restored; financial data and global projections preserved; payments, edits, month changes and empty filter');

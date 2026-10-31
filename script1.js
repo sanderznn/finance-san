@@ -16,6 +16,7 @@ try{const original=localStorage.getItem(KEY);if(original&&!localStorage.getItem(
 save();
 let tipo='gasto';
 let showAllMovements=false;
+let debtDayFilter='all';
 let selectedMonth=nowMonth();
 try{const savedMonth=localStorage.getItem(KEY+'_selectedMonth');if(validMonth(savedMonth))selectedMonth=savedMonth;}catch(e){}
 function rememberMonth(){try{localStorage.setItem(KEY+'_selectedMonth',selectedMonth)}catch(e){}}
@@ -153,18 +154,27 @@ function debtIndexForMonth(d, month){
   }
   return -1;
 }
-function currentMonthDebts(month=nowMonth()){
-  return (data.debts||[]).filter(d=>debtAppliesInMonth(d, month));
+function debtMatchesDay(d,day){
+  return day==='all'||Number(d.dia||10)===Number(day);
 }
-function currentMonthDebtTotal(month=nowMonth()){
-  return currentMonthDebts(month).reduce((sum,d)=>{
+function setDebtDayFilter(day){
+  const value=String(day);
+  if(!['all','5','20'].includes(value))return;
+  debtDayFilter=value;
+  render();
+}
+function currentMonthDebts(month=nowMonth(),day='all'){
+  return (data.debts||[]).filter(d=>debtAppliesInMonth(d,month)&&debtMatchesDay(d,day));
+}
+function currentMonthDebtTotal(month=nowMonth(),day='all'){
+  return currentMonthDebts(month,day).reduce((sum,d)=>{
     const idx=d.fixa?0:debtIndexForMonth(d,month);
     if(idx<0) return sum;
     return sum+debtValueInMonth(d,month);
   },0);
 }
-function currentMonthDebtPaid(month=nowMonth()){
-  return currentMonthDebts(month).reduce((sum,d)=>{
+function currentMonthDebtPaid(month=nowMonth(),day='all'){
+  return currentMonthDebts(month,day).reduce((sum,d)=>{
     if(d.fixa){
       return (d.paidMonths||[]).includes(month) ? sum+debtValueInMonth(d,month) : sum;
     }
@@ -1368,11 +1378,20 @@ cardEl.classList.remove('attention');
 
 
   if(typeof quickDebtMonth!=='undefined'){
-    const debtMonth=currentMonthDebtTotal(selectedMonth);
-    const debtPaid=currentMonthDebtPaid(selectedMonth);
+    const debtMonth=currentMonthDebtTotal(selectedMonth,debtDayFilter);
+    const debtPaid=currentMonthDebtPaid(selectedMonth,debtDayFilter);
     quickDebtMonth.textContent=fmt(debtMonth);
     quickDebtPaid.textContent=fmt(debtPaid);
     quickDebtOpen.textContent=fmt(Math.max(0,debtMonth-debtPaid));
+    document.getElementById('debtTotalLabel').textContent=debtDayFilter==='all'?'TOTAL DO MÊS':'TOTAL DO DIA '+debtDayFilter;
+    document.getElementById('debtSummaryNote').textContent=debtDayFilter==='all'
+      ? 'Contas fixas e parcelas do mês selecionado.'
+      : 'Vencimento dia '+debtDayFilter+' • mês selecionado.';
+    for(const [day,id] of [['all','debtFilterAll'],['5','debtFilter5'],['20','debtFilter20']]){
+      const button=document.getElementById(id),active=debtDayFilter===day;
+      button.className='debtDayButton'+(active?' active':'');
+      button.setAttribute('aria-pressed',String(active));
+    }
   }
 
   saldo.textContent=fmt(proj.safe);
@@ -1492,7 +1511,7 @@ if(typeof dailyQuote!=='undefined'){
     </div>
   </div>`).join('')||'<div class="empty">Nenhum lançamento ainda.</div>';
   const month=selectedMonth;
-  const orderedDebts=orderedDebtList(month);
+  const orderedDebts=orderedDebtList(month).filter(d=>debtMatchesDay(d,debtDayFilter));
   debtList.innerHTML=orderedDebts.map(d=>{
     if(d.dia===undefined) d.dia=10;
     if(d.fixa===undefined) d.fixa=false;
@@ -1672,7 +1691,7 @@ if(typeof dailyQuote!=='undefined'){
   </div>
 
 </details>`
-  }).join('')||'<div class="empty">Nenhuma dívida cadastrada.</div>';
+  }).join('')||'<div class="empty">'+(debtDayFilter==='all'?'Nenhuma dívida cadastrada.':'Nenhuma conta com vencimento no dia '+debtDayFilter+'.')+'</div>';
     const monthJobs=jobsInMonth(selectedMonth);
     const paidJobs=data.jobs.filter(j=>isJobPaid(j)&&Finance.jobMonth(j)===selectedMonth).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
     const pendJobs=monthJobs.filter(j=>!isJobPaid(j)&&jobIndex(j.status)>0).reduce((a,b)=>a+(parseFloat(b.valor)||0),0);
