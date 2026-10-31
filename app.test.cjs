@@ -1,12 +1,18 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
 const html=fs.readFileSync(__dirname+'/index.html','utf8');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]);
-function app(raw){
- const nodes={};function node(id){return nodes[id]||(nodes[id]={id,value:'',innerHTML:'',textContent:'',className:'',style:{},options:[],files:[],attributes:{},setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},classList:{add(){},remove(){},toggle(){}},appendChild(){},remove(){},click(){},querySelector(){return null},querySelectorAll(){return []}})}
- for(const m of html.matchAll(/\bid="([^"]+)"/g))node(m[1]);
- const storage=new Map();if(raw!==undefined)storage.set('sanFinancePro_v6_fixas',raw);
- const alerts=[],prompts=[];
- const ctx={console,Date,Math,JSON,Number,String,Array,Object,Set,Map,RegExp,Blob,URL,Promise,parseFloat,parseInt,confirm:()=>true,prompt:()=>prompts.shift()??null,alert:m=>alerts.push(m),setTimeout:()=>0,clearTimeout(){},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},navigator:{},document:{activeElement:null,body:node('body'),createElement:()=>node('new'),getElementById:node,querySelector:s=>s==='.section.active'?node('home'):null,querySelectorAll:()=>[],addEventListener(){}},addEventListener(){},...nodes};ctx.window=ctx;vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/finance-core.js','utf8'),ctx);for(const s of scripts)vm.runInContext(s,ctx);return {ctx,storage,alerts,prompts,run:s=>vm.runInContext(s,ctx)};
+function app(raw,{savedStorage}={}){
+ const nodes={};function node(id){
+  if(nodes[id])return nodes[id];
+  const n={id,value:'',innerHTML:'',textContent:'',className:'',style:{},options:[],files:[],attributes:{},setAttribute(k,v){this.attributes[k]=String(v)},getAttribute(k){return this.attributes[k]??null},appendChild(){},remove(){},click(){},focus(){},querySelector(){return null},querySelectorAll(){return []}};
+  n.classList={add(token){n.className=[...new Set([...n.className.split(' ').filter(Boolean),token])].join(' ')},remove(token){n.className=n.className.split(' ').filter(x=>x!==token).join(' ')},contains(token){return n.className.split(' ').includes(token)},toggle(token){this.contains(token)?this.remove(token):this.add(token)}};
+  return nodes[id]=n;
+ }
+ for(const m of html.matchAll(/<[^>]*\bid="([^"]+)"[^>]*>/g)){const n=node(m[1]);n.hidden=/\bhidden(?:[\s=>]|$)/.test(m[0]);n.className=m[0].match(/\bclass="([^"]*)"/)?.[1]||'';}
+ const storage=new Map(savedStorage||[]);if(raw!==undefined)storage.set('sanFinancePro_v6_fixas',raw);
+ const alerts=[],prompts=[],confirmations=[],downloads=[],readers=[],blobs=new Map();let serial=0;
+ class Reader{readAsText(file){this.file=file;readers.push(this);if(!file.defer)this.finish()}finish(){if(this.file.error)this.onerror();else{this.result=this.file.content;this.onload()}}}
+ const ctx={console,Date,Math,JSON,Number,String,Array,Object,Set,Map,RegExp,Blob,URL:{createObjectURL(blob){const url='blob:test-'+(++serial);blobs.set(url,blob);return url},revokeObjectURL(url){blobs.delete(url)}},FileReader:Reader,Promise,parseFloat,parseInt,confirm:()=>confirmations.length?confirmations.shift():true,prompt:()=>prompts.shift()??null,alert:m=>alerts.push(m),setTimeout:()=>0,clearTimeout(){},localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)},navigator:{},document:{activeElement:null,body:node('body'),createElement:tag=>{const n=node('new-'+(++serial));n.click=()=>{if(tag==='a')downloads.push({name:n.download,blob:blobs.get(n.href)})};return n},getElementById:node,querySelector:s=>s==='.section.active'?node('home'):null,querySelectorAll:()=>[],addEventListener(){}},addEventListener(){},...nodes};ctx.window=ctx;vm.createContext(ctx);for(const name of ['finance-core.js','recovery-store.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+name,'utf8'),ctx);for(const s of scripts)vm.runInContext(s,ctx);return {ctx,storage,alerts,prompts,confirmations,downloads,readers,run:s=>vm.runInContext(s,ctx)};
 }
 let a=app();assert.equal(a.run('totals().saldo'),0);assert.match(a.ctx.salaryReceipts.innerHTML,/dia 5/);
 a.run("salary5.value='1000';salary20.value='800';savePaySettings()");a.prompts.push('1000','2026-10-05');a.run("selectedMonth='2026-10';receiveSalary(5)");assert.equal(a.run("totals('2026-10').saldo"),1000);a.run('receiveSalary(5)');assert.equal(a.run('data.movs.length'),1);
@@ -69,3 +75,66 @@ a=app();a.run("selectedMonth='2026-10';data.debts=[{id:'only5',nome:'Conta cinco
 assert.match(a.ctx.debtList.innerHTML,/Nenhuma conta com vencimento no dia 20/);assert.equal(a.ctx.quickDebtMonth.textContent,'R$ 0,00');assert.equal(a.ctx.quickDebtPaid.textContent,'R$ 0,00');assert.equal(a.ctx.quickDebtOpen.textContent,'R$ 0,00');
 a.run("setDebtDayFilter('all')");assert.match(a.ctx.debtList.innerHTML,/Conta cinco/);
 console.log('PASS: due-day filters and accessible button state; matching summaries; all accounts restored; financial data and global projections preserved; payments, edits, month changes and empty filter');
+
+async function checkRecoveryFlows(){
+ const key='sanFinancePro_v6_fixas';
+ const fixture={salario:0,movs:[
+   {id:'income',tipo:'entrada',nome:'Salário',valor:1000,cat:'💰',ym:'2026-10'},
+   {id:'expense',tipo:'gasto',nome:'Cinema',valor:40,cat:'🎉 Lazer',ym:'2026-10'},
+   {id:'costMov',tipo:'gasto',nome:'Uber do job',valor:20,cat:'🎬 SAN / Job',ym:'2026-10',jobId:'job1',jobCostId:'cost1'},
+   {id:'invoiceMov',tipo:'gasto',nome:'Fatura',valor:100,cat:'💳 Cartão',ym:'2026-10',cardId:'card1',invoiceMonth:'2026-10'}
+ ],debts:[{id:'fixed',nome:'Internet',valor:80,dia:20,fixa:true,meses:1,inicio:'2026-10',pagos:[],paidMonths:['2026-10'],paymentRecords:{'2026-10':{date:'2026-10-20',value:80}}}],
+ jobs:[{id:'job1',cliente:'Cliente',valor:500,status:'Entregue',dataEvento:'2026-10-21',costs:[{id:'cost1',nome:'Uber',valor:20,movId:'costMov'}]}],wishes:[{id:'goal',nome:'Reserva',valor:200,guardado:50}],
+ creditCards:[{id:'card1',nome:'Cartão',limite:1000,vencimento:20,fechamento:1}],creditPurchases:[{id:'purchase',cardId:'card1',nome:'Compra',valor:100,parcelas:1,inicio:'2026-10'}],creditInvoicePayments:[{id:'invoice',cardId:'card1',ym:'2026-10',valor:100,movId:'invoiceMov',paidAt:'2026-10-20'}],paySettings:{day5:1000,day20:800}};
+ const raw=JSON.stringify(fixture),fresh=()=>{const instance=app(raw);instance.run("selectedMonth='2026-10';render()");return instance};
+ let c=fresh();const baseline=c.run('JSON.stringify(data)');
+ assert.equal(c.run('totals().saldo'),760);assert.equal(c.ctx.undoNotice.hidden,true);assert.equal(c.ctx.undoLastChangeBtn.disabled,true);
+ c.run("delMov('expense')");assert.equal(c.run('totals().saldo'),800);assert.equal(c.ctx.undoNotice.hidden,false);assert.equal(c.ctx.undoNoticeText.textContent,'Movimento apagado');
+ c.run('dismissUndoNotice()');assert.equal(c.ctx.undoNotice.hidden,true);assert.equal(c.ctx.undoLastChangeBtn.disabled,false);
+ const history=c.storage.get(key+'_previous');
+ c=app(undefined,{savedStorage:c.storage});c.run("selectedMonth='2026-10'");assert.equal(c.storage.get(key+'_previous'),history);
+ c.run('undoLastChange()');assert.equal(c.run(`dataStore.sameData(data,${baseline})`),true);assert.equal(c.run('totals().saldo'),760);assert.equal(c.ctx.undoNoticeAction.textContent,'Refazer');
+ c.run('undoLastChange()');assert.equal(c.run('totals().saldo'),800);c.run('undoLastChange()');
+ const priorHistory=c.storage.get(key+'_previous');c.confirmations.push(false);c.run("delMov('expense')");assert.equal(c.storage.get(key+'_previous'),priorHistory);
+ c.run("save('Nada mudou')");assert.equal(c.storage.get(key+'_previous'),priorHistory);
+ c.run("delMov('invoiceMov')");assert.equal(c.run('data.creditInvoicePayments.length'),0);assert.equal(c.run("creditOutstanding('card1')"),100);c.run('undoLastChange()');assert.equal(c.run('data.creditInvoicePayments[0].movId'),'invoiceMov');assert.equal(c.run("creditOutstanding('card1')"),0);
+ c.run("delJobCost('job1','cost1')");assert.equal(c.run('data.jobs[0].costs.length'),0);assert.equal(c.run("data.movs.some(m=>m.id==='costMov')"),false);c.run('undoLastChange()');assert.equal(c.run('data.jobs[0].costs[0].movId'),'costMov');assert.equal(c.run("data.movs.some(m=>m.id==='costMov')"),true);
+ c.run("setDebtDayFilter('20');toggleDebt('fixed',0)");assert.equal(c.ctx.quickDebtPaid.textContent,'R$ 0,00');c.run('undoLastChange()');assert.equal(c.ctx.quickDebtPaid.textContent,'R$ 80,00');assert.equal(c.run('debtDayFilter'),'20');
+ c.prompts.push('2026-11-03');c.run("updateJob('job1','Pago')");assert.equal(c.run("totals('2026-11').jobsPagos"),500);c.run('undoLastChange()');assert.equal(c.run("totals('2026-11').jobsPagos"),0);assert.equal(c.run('data.jobs[0].status'),'Entregue');
+ c.prompts.push('15');c.run("withdrawWish('goal')");assert.equal(c.run('data.wishes[0].guardado'),35);c.run('undoLastChange()');assert.equal(c.run('data.wishes[0].guardado'),50);
+ const beforeReset=c.run('JSON.stringify(data)');c.run('resetAll()');assert.equal(c.run('data.movs.length+data.debts.length+data.jobs.length+data.wishes.length'),0);c.run('undoLastChange()');assert.equal(c.run(`dataStore.sameData(data,${beforeReset})`),true);
+ console.log('PASS: app undo/redo survives reload; cancellation and no-op preserve history; card/job links, receipt dates, reserves and full reset recover together');
+
+ const replacement={movs:[{id:'replacement',nome:'Entrada da cópia',tipo:'entrada',valor:25,ym:'2026-10'}],debts:[],jobs:[],wishes:[]};
+ const selectFile=(instance,content,extra={})=>{
+   instance.ctx.backupFile.value='selected';instance.ctx.backupFile.files=[{name:'copia.json',content,...extra}];instance.run('importBackup({target:backupFile})');
+ };
+ c=fresh();let before=c.storage.get(key);selectFile(c,JSON.stringify({app:'SAN Finance',exportedAt:'2026-10-01T12:00:00Z',data:replacement}));
+ assert.equal(c.storage.get(key),before);assert.equal(c.ctx.restoreBackupModal.classList.contains('open'),true);assert.match(c.ctx.restoreBackupCounts.innerHTML,/<td>4<\/td><td>1<\/td>/);assert.equal(c.ctx.backupFile.value,'');
+ c.run('closeBackupRestore()');assert.equal(c.storage.get(key),before);assert.equal(c.ctx.restoreBackupModal.classList.contains('open'),false);
+ for(const invalid of ['{broken','null','{}',JSON.stringify({...replacement,movs:[{id:'bad',tipo:'gasto',valor:null,ym:'2026-10'}]}),JSON.stringify({...replacement,paySettings:{day5:-1}})]){
+   selectFile(c,invalid);assert.equal(c.storage.get(key),before);assert.equal(c.run('pendingBackupRestore'),null);assert.match(c.alerts.at(-1),/Backup inválido/);
+ }
+ selectFile(c,JSON.stringify(replacement));c.run('confirmBackupRestore()');assert.equal(c.run('data.movs[0].id'),'replacement');assert.equal(c.storage.get(key+'_beforeImport'),before);assert.equal(c.ctx.restoreBackupModal.classList.contains('open'),false);c.run('undoLastChange()');assert.equal(c.run('data.movs.length'),4);
+ selectFile(c,JSON.stringify(replacement));c.run("movNome.value='Novo';movValor.value='5';movCat.value='👤 Gastos pessoais';setTipo('gasto');addMov();confirmBackupRestore()");assert.equal(c.run("data.movs.some(m=>m.nome==='Novo')"),true);assert.match(c.alerts.at(-1),/Seus dados mudaram/);
+ c=fresh();before=c.storage.get(key);selectFile(c,JSON.stringify(replacement),{defer:true});const oldReader=c.readers.at(-1);selectFile(c,'{broken');oldReader.finish();assert.equal(c.run('pendingBackupRestore'),null);assert.equal(c.storage.get(key),before);
+ selectFile(c,'',{error:true});assert.match(c.alerts.at(-1),/Não foi possível ler/);assert.equal(c.storage.get(key),before);
+ c=fresh();selectFile(c,JSON.stringify(replacement));const otherTab=JSON.stringify({...fixture,movs:[...fixture.movs,{id:'otherTab',nome:'Outra aba',tipo:'entrada',valor:10,ym:'2026-10'}]});c.storage.set(key,otherTab);c.run('confirmBackupRestore()');assert.equal(c.storage.get(key),otherTab);assert.equal(c.run("data.movs.some(m=>m.id==='otherTab')"),true);assert.equal(c.ctx.restoreBackupModal.classList.contains('open'),false);
+ console.log('PASS: backup preview is read-only until confirmation; cancellation, invalid files, stale previews, out-of-order file reads and read failures preserve data');
+
+ c=app('{broken',{savedStorage:new Map([[key+'_previous',raw]])});assert.equal(c.run('storageBlocked'),true);assert.equal(c.storage.get(key),'{broken');assert.equal(c.ctx.backupExportBtn.textContent,'BAIXAR DADOS PRESERVADOS');
+ c.run('exportBackup()');assert.equal(await c.downloads.at(-1).blob.text(),'{broken');assert.equal(c.storage.has(key+'_backupExport'),false);
+ c.run("previewLocalBackup('_previous');confirmBackupRestore()");assert.equal(c.run('storageBlocked'),false);assert.equal(c.run('data.movs.length'),4);assert.equal(c.storage.get(key+'_beforeImport'),'{broken');assert.match(c.ctx.backupLocalCopies.innerHTML,/Baixar dados preservados/);
+ console.log('PASS: unreadable primary is never exported as an empty backup; explicit local recovery preserves the original damaged bytes');
+
+ c=fresh();before=c.storage.get(key);c.ctx.localStorage.setItem=(k,v)=>{if(k===key)throw Error('quota');c.storage.set(k,String(v))};
+ c.run("movNome.value='Não salvo';movValor.value='15';movCat.value='🎉 Lazer';setTipo('gasto')");assert.equal(c.run('addMov()'),false);assert.equal(c.storage.get(key),before);assert.equal(c.run('data.movs.length'),4);assert.equal(c.ctx.movNome.value,'Não salvo');assert.equal(c.ctx.undoNotice.hidden,true);
+ c.run('exportBackup()');let exported=JSON.parse(await c.downloads.at(-1).blob.text());assert.equal(exported.data.movs.length,4);assert.equal(exported.app,'SAN Finance');assert.match(c.downloads.at(-1).name,/^san-finance-backup-\d{4}-\d{2}-\d{2}-\d{6}\.json$/);
+ c=fresh();c.run('exportBackup()');exported=JSON.parse(await c.downloads.at(-1).blob.text());assert.equal(exported.data.movs.length,4);assert.match(c.ctx.backupStatus.textContent,/Backup gerado em/);
+ const roundTrip=app();selectFile(roundTrip,JSON.stringify(exported));roundTrip.run("confirmBackupRestore();selectedMonth='2026-10'");assert.equal(roundTrip.run(`dataStore.sameData(data,${JSON.stringify(exported.data)})`),true);assert.equal(roundTrip.run('totals().saldo'),760);assert.equal(roundTrip.run('data.jobs[0].costs[0].movId'),'costMov');assert.equal(roundTrip.run('data.creditInvoicePayments[0].movId'),'invoiceMov');
+ c.run("movNome.value='Mais um';movValor.value='5';movCat.value='🎉 Lazer';setTipo('gasto');addMov()");assert.match(c.ctx.backupStatus.textContent,/Há alterações depois dele/);
+ c=fresh();c.ctx.localStorage.setItem=(k,v)=>{if(k===key+'_backupExport')throw Error('quota');c.storage.set(k,String(v))};assert.equal(c.run('exportBackup()'),true);assert.match(c.ctx.backupStatus.textContent,/Backup gerado em/);
+ assert.equal(c.run('backupDate(null)'),'');
+ console.log('PASS: failed saves roll back data and keep form inputs; exported JSON matches committed data; generated-backup status tracks subsequent changes');
+}
+checkRecoveryFlows().catch(error=>{console.error(error);process.exitCode=1});

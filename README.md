@@ -16,24 +16,31 @@ Aplicativo pessoal em português, com armazenamento local no navegador. A versã
 
 ## Atualização e recuperação
 
-Exporte um backup JSON antes da atualização. Uma cópia local anterior à migração é preservada em `sanFinancePro_v6_fixas_beforeV7`. Importações preservam os dados anteriores em `_beforeImport`; gravações mantêm uma cópia em `_previous`. Essas cópias ficam no mesmo navegador e não substituem um backup baixado.
+Em **Configurações → Backup e recuperação**, baixe um arquivo JSON e salve-o em Arquivos ou iCloud Drive. A tela registra quando o arquivo foi gerado e avisa quando houver novas alterações. Esse horário indica geração, não confirma que o arquivo foi salvo pelo navegador.
 
-Dados inválidos bloqueiam gravações automáticas. Em Configurações, baixe os dados originais e importe um backup válido. Nenhuma sincronização com outro dispositivo é oferecida.
+Após uma alteração, o aviso **Desfazer** fica visível por dez segundos; a mesma ação continua disponível em Configurações e depois de reabrir o app. É possível desfazer **uma alteração por vez**, com **Refazer** para reverter o desfazimento. Uma nova alteração substitui essa possibilidade. Operações vinculadas, como custo de job e saída financeira ou pagamento e fatura, são recuperadas juntas.
+
+Ao restaurar um arquivo ou uma cópia local, confira a quantidade de registros antes de confirmar a substituição. A restauração e a limpeza preservam os dados anteriores em `sanFinancePro_v6_fixas_beforeImport` e também podem ser desfeitas quando os dados anteriores são válidos. **Mais opções de recuperação** dá acesso às cópias locais disponíveis. Arquivos antigos com os dados diretamente na raiz continuam compatíveis.
+
+`sanFinancePro_v6_fixas_previous` aceita a cópia antiga sem envelope e agora guarda `{kind, version, revision, at, label, mode, data}`. A revisão `_sanRevision` liga o desfazimento à gravação correspondente. Abrir o app, trocar filtros e salvar sem mudanças não substituem essa cópia. Falhas de gravação preservam o estado confirmado; alterações detectadas em outra aba são carregadas antes de permitir uma nova tentativa. A cópia anterior à migração continua em `sanFinancePro_v6_fixas_beforeV7`.
+
+Dados inválidos bloqueiam gravações automáticas. Nessa situação, baixar o backup preserva o conteúdo original em vez de gerar uma cópia vazia. Restaure uma cópia válida; o conteúdo ilegível anterior fica disponível para download. As cópias locais ficam no mesmo navegador e podem desaparecer se seus dados forem apagados. Elas não substituem um arquivo salvo fora do app. Nenhuma sincronização com outro dispositivo é oferecida.
 
 Pagamentos antigos de dívidas sem data registrada mantêm o mês de vencimento como referência, pois não é possível inferir a data real. Jobs antigos sem data de recebimento usam o mês do evento como fallback. Novos pagamentos registram a data informada.
 
 ## Código e testes
 
-`index.html` é a interface e contém os controladores ativos. `finance-core.js` concentra cálculos em centavos e não depende do navegador. `script1.js` a `script4.js` são cópias dos blocos inline para consulta, não são carregados pela página. Ao editar controladores, atualize essas cópias.
+`index.html` é a interface e contém os controladores ativos. `finance-core.js` concentra cálculos em centavos; `recovery-store.js` cuida da gravação e da recuperação de uma alteração, com armazenamento injetável para testes. `script1.js` a `script4.js` são cópias dos blocos inline para consulta, não são carregados pela página. Ao editar controladores, atualize essas cópias.
 
 Execute com Node.js:
 
 ```
 node finance-core.test.cjs
+node recovery-store.test.cjs
 node app.test.cjs
 ```
 
-Os testes cobrem saldo acumulado, datas de recebimento/pagamento, centavos, cartão sem pagamento, diferença de fatura, atrasos, reservas, recebimento de salário sem duplicação, restauração e bloqueio de dados corrompidos. O teste dos controladores usa uma simulação mínima do DOM, não valida layout, Safari ou interação real de toque. É necessário conferir a atualização no aparelho.
+Os testes cobrem saldo acumulado, datas, centavos, cartões, atrasos, reservas, salários, filtros por vencimento, desfazer/refazer após reabrir, recuperação de vínculos, prévia e cancelamento da importação, exportação e restauração do JSON, arquivos inválidos, conflito entre abas, falhas de leitura e gravação e preservação dos dados corrompidos. O teste dos controladores usa uma simulação do DOM, não valida layout, Safari ou interação real de toque. É necessário conferir a atualização no aparelho.
 
 ## Dashboard
 

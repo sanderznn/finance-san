@@ -2580,6 +2580,30 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 .debtDayButton.active {background:#fff;color:#050505}
 .debtDayButton:focus-visible {outline:2px solid #fff;outline-offset:2px}
 
+.backupState {margin:10px 0 14px;color:var(--soft);font-size:.82rem;line-height:1.5}
+.backupState.warn {color:var(--yellow)}
+.backupState.bad {color:var(--red)}
+.backupHint {margin-top:10px;line-height:1.5;overflow-wrap:anywhere}
+.backupMore {margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.backupMore summary {cursor:pointer;color:var(--soft);font-size:.82rem;font-weight:700}
+.backupMore .ghost {width:100%;margin-top:10px;min-height:44px}
+#undoLastChangeBtn:disabled {opacity:.4;cursor:default}
+.backupPreview {width:100%;border-collapse:collapse;margin:16px 0;font-size:.82rem}
+.backupPreview th,.backupPreview td {padding:9px 4px;border-bottom:1px solid var(--line);text-align:right}
+.backupPreview th:first-child,.backupPreview td:first-child {text-align:left}
+.backupPreview th {color:var(--muted);font-weight:600}
+.undoBar {
+  position:fixed;left:14px;right:96px;bottom:calc(22px + env(safe-area-inset-bottom));
+  z-index:85;display:flex;align-items:center;gap:8px;max-width:460px;
+  padding:10px;border:1px solid rgba(255,255,255,.20);border-radius:18px;
+  background:#222225;box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+.undoBar[hidden] {display:none!important}
+.undoBar span {flex:1;min-width:0;font-size:.76rem;line-height:1.4;overflow-wrap:anywhere}
+.undoBar button {min-height:40px;border:0;border-radius:10px;font-family:inherit;font-weight:800;cursor:pointer}
+.undoAction {padding:8px 10px;background:#fff;color:#050505;font-size:.75rem}
+.undoDismiss {padding:4px;background:transparent;color:var(--soft);font-size:1.15rem}
+
 </style>
 
 </head>
@@ -2987,15 +3011,23 @@ bottom:calc(22px + env(safe-area-inset-bottom));
   </section>
   <section id="config" class="section">
 <div id="salaryReceipts" class="card"></div>
-<div class="card"><h3>Planejamento e saldo</h3><p class="sub">Configure os salários previstos. Eles só entram no saldo quando você marcar o recebimento.</p><label>Salário do dia 5<input id="salary5" type="number" min="0" step="0.01"></label><label>Salário do dia 20<input id="salary20" type="number" min="0" step="0.01"></label><button class="primary" onclick="savePaySettings()">SALVAR SALÁRIOS</button><button class="ghost" onclick="reconcileBalance()">Conferir saldo real</button><p class="sub">O saldo real deve incluir o dinheiro separado nas metas. As metas são descontadas apenas do disponível para gastar.</p><button class="ghost" onclick="downloadOriginal()">Baixar dados locais originais</button></div>
+<div class="card"><h3>Planejamento e saldo</h3><p class="sub">Configure os salários previstos. Eles só entram no saldo quando você marcar o recebimento.</p><label>Salário do dia 5<input id="salary5" type="number" min="0" step="0.01"></label><label>Salário do dia 20<input id="salary20" type="number" min="0" step="0.01"></label><button class="primary" onclick="savePaySettings()">SALVAR SALÁRIOS</button><button class="ghost" onclick="reconcileBalance()">Conferir saldo real</button><p class="sub">O saldo real deve incluir o dinheiro separado nas metas. As metas são descontadas apenas do disponível para gastar.</p></div>
     <div class="title">Configurações</div>
 
     <div class="card">
-      <div class="cardTitle">💾 Dados</div>
-      <div class="sub" style="margin-bottom:12px">Centralize aqui tudo que envolve salvar, restaurar e baixar seus registros.</div>
-      <button class="primary" onclick="exportBackup()">BAIXAR BACKUP JSON</button>
-      <button class="ghost" style="width:100%;margin-top:8px" onclick="document.getElementById('backupFile').click()">IMPORTAR BACKUP</button>
-      <button class="ghost" style="width:100%;margin-top:8px" onclick="exportCSV()">EXPORTAR CSV</button>
+      <div class="cardTitle">💾 Backup e recuperação</div>
+      <div id="backupStatus" class="backupState" role="status"></div>
+      <button id="backupExportBtn" class="primary" onclick="exportBackup()">BAIXAR BACKUP</button>
+      <div class="sub backupHint">Salve o arquivo em Arquivos ou iCloud Drive. As cópias locais ficam somente neste navegador.</div>
+      <button class="ghost" style="width:100%;margin-top:12px" onclick="document.getElementById('backupFile').click()">RESTAURAR DE UM ARQUIVO</button>
+      <button id="undoLastChangeBtn" class="ghost" style="width:100%;margin-top:8px" onclick="undoLastChange()" disabled>DESFAZER ÚLTIMA ALTERAÇÃO</button>
+      <div id="undoLastChangeHint" class="sub backupHint" hidden></div>
+      <details class="backupMore">
+        <summary>Mais opções de recuperação</summary>
+        <div id="backupLocalCopies"></div>
+        <button class="ghost" onclick="downloadOriginal()">Baixar dados locais originais</button>
+        <button class="ghost" onclick="exportCSV()">Exportar planilha CSV</button>
+      </details>
       <input id="backupFile" type="file" accept="application/json,.json" style="display:none" onchange="importBackup(event)">
     </div>
 
@@ -3296,7 +3328,31 @@ bottom:calc(22px + env(safe-area-inset-bottom));
 
 </div>
 
+<div id="undoNotice" class="undoBar" hidden>
+  <span id="undoNoticeText" role="status" aria-live="polite" aria-atomic="true"></span>
+  <button id="undoNoticeAction" class="undoAction" type="button" onclick="undoLastChange()">Desfazer</button>
+  <button class="undoDismiss" type="button" aria-label="Fechar aviso" onclick="dismissUndoNotice()">×</button>
+</div>
+
+<div class="modalOverlay" id="restoreBackupModal" role="dialog" aria-modal="true" aria-labelledby="restoreBackupTitle" aria-describedby="restoreBackupNote" onclick="if(event.target===this)closeBackupRestore()">
+  <div class="modalCard">
+    <div class="modalHead">
+      <div><div class="eyebrow">recuperar dados</div><h3 id="restoreBackupTitle">Conferir backup</h3></div>
+      <button class="modalClose" aria-label="Cancelar restauração" onclick="closeBackupRestore()">×</button>
+    </div>
+    <div id="restoreBackupSource" class="sub backupHint"></div>
+    <table class="backupPreview">
+      <thead><tr><th scope="col">Registros</th><th scope="col">Agora</th><th scope="col">Na cópia</th></tr></thead>
+      <tbody id="restoreBackupCounts"></tbody>
+    </table>
+    <p id="restoreBackupNote" class="sub" style="margin-bottom:16px"></p>
+    <button id="restoreBackupConfirm" class="primary" onclick="confirmBackupRestore()">RESTAURAR ESTA CÓPIA</button>
+    <button class="ghost" style="width:100%;margin-top:8px" onclick="closeBackupRestore()">CANCELAR</button>
+  </div>
+</div>
+
 <script src="finance-core.js"></script>
+<script src="recovery-store.js"></script>
 <script>
 const KEY='sanFinancePro_v6_fixas';
 const defaultData={
@@ -3310,10 +3366,16 @@ const defaultData={
   creditInvoicePayments:[]
 };
 let storageBlocked=false;
+let backupIssue='';
+let lastBackupExport=null;
+let undoNoticeTimer=null;
+let pendingBackupRestore=null;
+let backupReadSequence=0;
+const dataStore=FinanceRecovery.create({storage:localStorage,key:KEY,normalize:d=>repairData(validateBackup(d)),empty:()=>repairData(JSON.parse(JSON.stringify(defaultData))),revision:uid});
 let data=load();
 data=repairData(data);
 try{const original=localStorage.getItem(KEY);if(original&&!localStorage.getItem(KEY+'_beforeV7'))localStorage.setItem(KEY+'_beforeV7',original);}catch(e){}
-save();
+save('',{initial:true});
 let tipo='gasto';
 let showAllMovements=false;
 let debtDayFilter='all';
@@ -3357,13 +3419,23 @@ function repairData(d){
   return Object.assign({}, defaultData, d);
 }
 function load(){
- try{const raw=localStorage.getItem(KEY);if(raw===null)return repairData(JSON.parse(JSON.stringify(defaultData)));return repairData(validateBackup(JSON.parse(raw)));}
- catch(e){storageBlocked=true;setTimeout(()=>alert('Os dados locais não puderam ser lidos. Eles foram preservados. Use Configurações para baixar os dados originais e restaurar um backup.'),0);return repairData(JSON.parse(JSON.stringify(defaultData)));}
+ const result=dataStore.open();storageBlocked=result.blocked;
+ if(storageBlocked)setTimeout(()=>alert('Os dados locais não puderam ser lidos. Eles foram preservados. Use Backup e recuperação em Configurações.'),0);
+ return result.data;
 }
-function save(){
- if(storageBlocked){alert('Gravação bloqueada para proteger seus dados. Exporte uma cópia e restaure um backup válido em Configurações.');return false;}
- try{const old=localStorage.getItem(KEY);if(old)localStorage.setItem(KEY+'_previous',old);localStorage.setItem(KEY,JSON.stringify(data));return true;}
- catch(e){storageBlocked=true;alert('Não foi possível salvar. Exporte um backup agora; não feche o app antes disso.');return false;}
+function applyStoredResult(result,message,quiet=false){
+ data=result.data;storageBlocked=result.blocked;
+ const errors={blocked:'Os dados locais estão protegidos. Recupere uma cópia válida em Configurações.',invalid:'A alteração contém dados inválidos e não foi salva.',conflict:'Os dados mudaram em outra aba. A lista foi atualizada; confira antes de tentar novamente.',storage:'Não foi possível salvar. A alteração não foi aplicada. Baixe um backup em Configurações.',unavailable:'Não há uma alteração disponível para desfazer.'};
+ backupIssue=result.ok?'':(errors[result.reason]||'Não foi possível concluir a alteração.');
+ if(!quiet){
+   renderDataRecovery();
+   if(result.ok&&result.changed)showUndoNotice(message);
+   else if(!result.ok){dismissUndoNotice();alert(backupIssue);}
+ }
+ return result.ok;
+}
+function save(label='Alteração salva',options={}){
+ return applyStoredResult(dataStore.commit(data,{label,...options}),label,!!options.initial);
 }
 function fmt(v){return 'R$ '+Number(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
 function nowMonth(){return Finance.localDate().slice(0,7)}
@@ -3491,7 +3563,8 @@ function addMov(){
   if(!nome||!Number.isFinite(valor)||valor<=0){alert('Preenche nome e valor.');return false}
   if(valor>50000 && !confirm('Valor muito alto. Confirmar lançamento?')) return false;
   data.movs.unshift({id:uid(),tipo,nome,valor,cat:tipo==='entrada'?'💰':movCat.value,ym:selectedMonth,date:new Date().toLocaleDateString('pt-BR'),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});
-  movNome.value='';movValor.value='';save();render();return true
+  if(!save('Movimento registrado')){render();return false;}
+  movNome.value='';movValor.value='';render();return true
 }
 let editingMovId = null;
 let editingMovTipo = 'gasto';
@@ -3628,7 +3701,7 @@ function saveEditMov(){
       document.getElementById('editMovCat').value;
   }
 
-  save();
+  if(!save('Movimento alterado')){render();return;}
   render();
   closeEditMovModal();
 }
@@ -3638,7 +3711,7 @@ function saveEditMov(){
   data.movs=(data.movs||[]).filter(m=>m.id!==id);
   data.creditInvoicePayments=(data.creditInvoicePayments||[]).filter(p=>p.movId!==id);
   (data.jobs||[]).forEach(j=>{if(Array.isArray(j.costs)) j.costs=j.costs.map(c=>c.movId===id?Object.assign({},c,{movId:''}):c)});
-  save();render();
+  save('Movimento apagado');render();
 }
 function toggleDebtType(){
   if(typeof debtTipo === 'undefined') return;
@@ -3659,20 +3732,22 @@ function addDebt(){
   if(!dia || dia < 1 || dia > 31) dia=10;
   if(!nome||!Number.isFinite(valor)||valor<=0||(!fixa&&(!Number.isInteger(meses)||meses<1||meses>600))){alert('Preenche nome, valor e meses.');return}
   data.debts.unshift({id:uid(),nome,valor,meses,fixa,inicio,dia,pagos:[],paidMonths:[]});
+  if(!save('Conta cadastrada')){render();return;}
   debtNome.value='';debtValor.value='';debtMeses.value='';debtInicio.value='';debtDia.value='';
   const fc=document.getElementById('formDebtCard'); if(fc) fc.classList.remove('open');
   if(typeof debtTipo !== 'undefined'){debtTipo.value='parcelada'; toggleDebtType();}
-  save();render()
+  render()
 }
 function toggleDebt(id,idx,month=selectedMonth){
  const d=data.debts.find(x=>x.id===id);if(!d)return;
  const key=d.fixa?month:String(idx),list=d.fixa?(d.paidMonths||(d.paidMonths=[])):(d.pagos||(d.pagos=[])),entry=d.fixa?month:idx;
  d.paymentRecords=d.paymentRecords||{};
- if(list.includes(entry)){if(!confirm('Desmarcar este pagamento?'))return;list.splice(list.indexOf(entry),1);delete d.paymentRecords[key];}
+ const removing=list.includes(entry);
+ if(removing){if(!confirm('Desmarcar este pagamento?'))return;list.splice(list.indexOf(entry),1);delete d.paymentRecords[key];}
  else{const date=prompt('Data do pagamento (AAAA-MM-DD)',Finance.localDate());if(date===null)return;if(!validDate(date)){alert('Data inválida.');return;}list.push(entry);d.paymentRecords[key]={date,value:d.valor};}
- save();render();
+ save(removing?'Pagamento desmarcado':'Pagamento registrado');render();
 }
-function delDebt(id){const d=data.debts.find(x=>x.id===id);if(d&&((d.pagos||[]).length||(d.paidMonths||[]).length)){alert('Esta conta possui pagamentos. Desmarque-os antes de apagar para preservar o histórico.');return;}if(confirm('Apagar essa dívida?')){data.debts=data.debts.filter(d=>d.id!==id);save();render()}}
+function delDebt(id){const d=data.debts.find(x=>x.id===id);if(d&&((d.pagos||[]).length||(d.paidMonths||[]).length)){alert('Esta conta possui pagamentos. Desmarque-os antes de apagar para preservar o histórico.');return;}if(confirm('Apagar essa dívida?')){data.debts=data.debts.filter(d=>d.id!==id);save('Conta apagada');render()}}
 function addMonths(ym,n){return Finance.add(ym,n)}
 let savingJob=false;
 function addJob(){
@@ -3687,13 +3762,14 @@ function addJob(){
   const newJob={id:uid(),cliente,valor,status:jobStatusLabel(status),obs,dataEvento,costs:[]};
   if(isJobPaid(newJob)){newJob.paidAt=new Date().toISOString();newJob.paidMonth=nowMonth();}
   data.jobs.unshift(newJob);
+  if(!save('Job cadastrado')){savingJob=false;render();return;}
   // Quando o job é lançado para um mês futuro, o app muda para o mês do evento
   // para o cadastro aparecer imediatamente na lista de Jobs.
   selectedMonth=String(dataEvento).slice(0,7);
   rememberMonth();
   jobCliente.value='';jobValor.value='';jobObs.value='';jobDataEvento.value='';
   const fc=document.getElementById('formJobCard'); if(fc) fc.classList.remove('open');
-  save();render();savingJob=false
+  render();savingJob=false
 }
 function jobEventInfo(dateStr){
   if(!dateStr) return '';
@@ -3742,10 +3818,10 @@ function updateJob(id,status){
     const nowPaid=isJobPaid(j);
     if(nowPaid&&!wasPaid){const date=prompt('Data do recebimento (AAAA-MM-DD)',Finance.localDate());if(!validDate(date)){j.status=previousStatus;return;}j.paidAt=date;j.paidMonth=date.slice(0,7);}
     if(!nowPaid&&wasPaid){delete j.paidAt;delete j.paidMonth;}
-    save();render();
+    save(nowPaid&&!wasPaid?'Recebimento registrado':'Job atualizado');render();
   }
 }
-function delJob(id){const j=data.jobs.find(x=>x.id===id);if(j&&(isJobPaid(j)||(j.costs||[]).length)){alert('Este job possui recebimento ou custos. Remova esses vínculos antes de apagar.');return;}data.jobs=repairIds(data.jobs,'job');if(confirm('Apagar job?')){data.jobs=data.jobs.filter(j=>j.id!==id);save();render()}}
+function delJob(id){const j=data.jobs.find(x=>x.id===id);if(j&&(isJobPaid(j)||(j.costs||[]).length)){alert('Este job possui recebimento ou custos. Remova esses vínculos antes de apagar.');return;}data.jobs=repairIds(data.jobs,'job');if(confirm('Apagar job?')){data.jobs=data.jobs.filter(j=>j.id!==id);save('Job apagado');render()}}
 
 function jobCostTotal(j){
   return (j&&Array.isArray(j.costs)?j.costs:[]).reduce((sum,c)=>sum+(parseFloat(c.valor)||0),0);
@@ -3772,7 +3848,7 @@ function addJobCost(id){
     });
   }
   j.costs.push({id:costId,nome,valor,movId,createdAt:new Date().toISOString()});
-  save();render();
+  save('Custo registrado');render();
 }
 function delJobCost(jobId,costId){
   const j=(data.jobs||[]).find(x=>x.id===jobId);
@@ -3782,49 +3858,131 @@ function delJobCost(jobId,costId){
   if(!confirm('Apagar este custo do job?')) return;
   if(c.movId) data.movs=(data.movs||[]).filter(m=>m.id!==c.movId);
   j.costs=j.costs.filter(x=>x.id!==costId);
-  save();render();
+  save('Custo apagado');render();
 }
 function addWish(){
   const nome=wishNome.value.trim(), valor=parseFloat(wishValor.value), guardado=parseFloat(wishGuardado.value||0);
   if(!nome||!Number.isFinite(valor)||valor<=0||!Number.isFinite(guardado)||guardado<0){alert('Confira nome, meta e valor guardado.');return}
   data.wishes.unshift({id:uid(),nome,valor,guardado});
-  wishNome.value='';wishValor.value='';wishGuardado.value='';const fc=document.getElementById('formWishCard'); if(fc) fc.classList.remove('open');save();render()
+  if(!save('Meta cadastrada')){render();return;}
+  wishNome.value='';wishValor.value='';wishGuardado.value='';const fc=document.getElementById('formWishCard'); if(fc) fc.classList.remove('open');render()
 }
 function addWishMoney(id){
   const v=parseFloat((prompt('Quanto você vai adicionar nessa meta?')||'0').replace(',','.'));
-  if(v>0){let w=data.wishes.find(x=>x.id===id);w.guardado+=v;save();render()}
+  if(v>0){let w=data.wishes.find(x=>x.id===id);w.guardado+=v;save('Reserva adicionada');render()}
 }
-function delWish(id){if(confirm('Apagar desejo?')){data.wishes=data.wishes.filter(w=>w.id!==id);save();render()}}
+function delWish(id){if(confirm('Apagar desejo?')){data.wishes=data.wishes.filter(w=>w.id!==id);save('Meta apagada');render()}}
 
+function backupDate(value){
+ if(!value)return '';
+ const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
+}
+function backupFileStamp(){
+ const now=new Date();return Finance.localDate()+'-'+[now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>String(n).padStart(2,'0')).join('');
+}
+function downloadJSON(text,name){
+ const blob=new Blob([text],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+ try{link.href=url;link.download=name;document.body.appendChild(link);link.click();}
+ finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+}
 function exportBackup(){
-  const payload={
-    app:'SAN Finance',
-    version:'Alpha3-Planejamento-SANBusiness',
-    exportedAt:new Date().toISOString(),
-    storageKey:KEY,
-    data:data
-  };
-  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  const date=Finance.localDate();
-  a.href=url;
-  a.download='san-finance-backup-'+date+'.json';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),500);
+ if(storageBlocked)return downloadOriginal();
+ try{
+   const snapshot=repairData(validateBackup(data)),at=new Date().toISOString();
+   const payload={app:'SAN Finance',version:'Recovery-v1',exportedAt:at,storageKey:KEY,data:snapshot};
+   downloadJSON(JSON.stringify(payload,null,2),'san-finance-backup-'+backupFileStamp()+'.json');
+   lastBackupExport={at,revision:snapshot._sanRevision||null};
+   try{localStorage.setItem(KEY+'_backupExport',JSON.stringify(lastBackupExport));}catch(error){}
+   renderDataRecovery();
+   return true;
+ }catch(error){alert('Não foi possível gerar o backup. Seus dados continuam no aplicativo.');return false;}
 }
-
+function dismissUndoNotice(){
+ clearTimeout(undoNoticeTimer);undoNoticeTimer=null;
+ document.getElementById('undoNotice').hidden=true;
+}
+function showUndoNotice(message){
+ dismissUndoNotice();
+ const copy=dataStore.undoCandidate();
+ document.getElementById('undoNoticeText').textContent=message||'Alteração salva';
+ const action=document.getElementById('undoNoticeAction');action.hidden=!copy;action.textContent=copy&&copy.mode==='redo'?'Refazer':'Desfazer';
+ document.getElementById('undoNotice').hidden=false;
+ undoNoticeTimer=setTimeout(dismissUndoNotice,10000);
+}
+function undoLastChange(){
+ const result=dataStore.undo();
+ if(applyStoredResult(result,result.action==='redo'?'Alteração refeita':'Alteração desfeita')){
+   closeEditMovModal();closeEditDebt();closeBackupRestore();
+ }
+ render();
+}
+function renderDataRecovery(){
+ const status=document.getElementById('backupStatus');if(!status)return;
+ let exported=lastBackupExport;try{if(!exported)exported=JSON.parse(localStorage.getItem(KEY+'_backupExport')||'null');}catch(error){}
+ const date=exported&&backupDate(exported.at);
+ status.className='backupState';
+ if(storageBlocked){status.textContent='Os dados locais não puderam ser lidos. Baixe os dados preservados ou confira uma cópia abaixo.';status.className+=' bad';}
+ else if(backupIssue){status.textContent=backupIssue;status.className+=' bad';}
+ else if(date){const changed=(exported.revision||null)!==(data._sanRevision||null);status.textContent='Backup gerado em '+date+(changed?'. Há alterações depois dele.':'.');if(changed)status.className+=' warn';}
+ else{status.textContent='Nenhum backup gerado por esta versão do app. Baixe sua primeira cópia.';status.className+=' warn';}
+ document.getElementById('backupExportBtn').textContent=storageBlocked?'BAIXAR DADOS PRESERVADOS':'BAIXAR BACKUP';
+ const undo=dataStore.undoCandidate(),button=document.getElementById('undoLastChangeBtn'),hint=document.getElementById('undoLastChangeHint');
+ button.disabled=!undo;button.textContent=undo&&undo.mode==='redo'?'REFAZER ÚLTIMA ALTERAÇÃO':'DESFAZER ÚLTIMA ALTERAÇÃO';
+ hint.hidden=!undo;hint.textContent=undo?undo.label+(backupDate(undo.at)?' • '+backupDate(undo.at):''):'';
+ const labels={'_previous':'Última cópia local','_beforeImport':'Antes da última restauração ou limpeza','_beforeV7':'Antes da atualização'};
+ document.getElementById('backupLocalCopies').innerHTML=Object.entries(labels).map(([suffix,label])=>{
+   if(suffix==='_previous'&&undo)return '';
+   const copy=dataStore.readCopy(suffix);
+   if(copy&&(storageBlocked||!dataStore.sameData(copy.data,data)))return `<button class="ghost" onclick="previewLocalBackup('${suffix}')">${label}</button>`;
+   if(suffix==='_beforeImport'&&!copy){try{if(localStorage.getItem(KEY+suffix))return `<button class="ghost" onclick="downloadLocalCopy('${suffix}')">Baixar dados preservados antes da recuperação</button>`;}catch(error){}}
+   return '';
+ }).join('');
+}
+function previewBackupRestore(next,source){
+ closeBackupRestore();
+ const checked=repairData(validateBackup(next));
+ if(!storageBlocked&&dataStore.sameData(checked,data)){alert('Essa cópia já corresponde aos dados atuais.');return;}
+ pendingBackupRestore={data:checked,token:dataStore.token()};
+ document.getElementById('restoreBackupSource').textContent=source;
+ const rows=[['Lançamentos','movs'],['Contas','debts'],['Jobs','jobs'],['Metas','wishes'],['Cartões','creditCards'],['Compras no cartão','creditPurchases']];
+ document.getElementById('restoreBackupCounts').innerHTML=rows.map(([label,key])=>`<tr><th scope="row">${label}</th><td>${storageBlocked?'—':(data[key]||[]).length}</td><td>${(checked[key]||[]).length}</td></tr>`).join('');
+ document.getElementById('restoreBackupNote').textContent=storageBlocked
+   ? 'Esta cópia substituirá os dados locais. Os dados originais serão preservados para download.'
+   : 'Os registros atuais serão substituídos. Você poderá desfazer esta restauração.';
+ document.getElementById('restoreBackupModal').classList.add('open');
+ const button=document.getElementById('restoreBackupConfirm');if(typeof button.focus==='function')button.focus();
+}
+function closeBackupRestore(){
+ pendingBackupRestore=null;backupReadSequence++;
+ document.getElementById('restoreBackupModal').classList.remove('open');
+}
+function previewLocalBackup(suffix){
+ const copy=dataStore.readCopy(suffix);
+ if(!copy){alert('Essa cópia não pôde ser lida. Nenhum dado foi alterado.');return;}
+ const labels={'_previous':'Última cópia local','_beforeImport':'Antes da última restauração ou limpeza','_beforeV7':'Antes da atualização'};
+ previewBackupRestore(copy.data,labels[suffix]||'Cópia local');
+}
+function confirmBackupRestore(){
+ if(!pendingBackupRestore)return;
+ if(pendingBackupRestore.token!==dataStore.token()){closeBackupRestore();alert('Seus dados mudaram. Confira a cópia novamente antes de restaurar.');return;}
+ data=pendingBackupRestore.data;
+ if(!save('Backup restaurado',{protect:true,allowBlocked:true})){if(pendingBackupRestore.token!==dataStore.token())closeBackupRestore();render();return;}
+ closeBackupRestore();render();
+}
 function importBackup(event){
- const file=event.target.files&&event.target.files[0];if(!file)return;
- const reader=new FileReader();reader.onload=()=>{try{
- const parsed=JSON.parse(reader.result),next=repairData(validateBackup(parsed.data||parsed));
- if(!confirm('Substituir os dados atuais por este backup? Uma cópia local anterior será preservada.'))return;
- const old=localStorage.getItem(KEY);if(old)localStorage.setItem(KEY+'_beforeImport',old);
- localStorage.setItem(KEY,JSON.stringify(next));data=next;storageBlocked=false;render();alert('Backup restaurado.');
- }catch(e){alert('Backup inválido ou armazenamento indisponível. Os dados anteriores foram preservados.');}finally{event.target.value='';}};
- reader.onerror=()=>alert('Não foi possível ler o arquivo.');reader.readAsText(file);
+ const input=event.target,file=input.files&&input.files[0];if(!file)return;
+ closeBackupRestore();
+ const sequence=++backupReadSequence,reader=new FileReader();
+ reader.onload=()=>{
+   if(sequence!==backupReadSequence)return;
+   try{
+     const parsed=JSON.parse(reader.result);
+     previewBackupRestore(parsed.data||parsed,'Arquivo: '+String(file.name||'backup.json')+(parsed.exportedAt&&backupDate(parsed.exportedAt)?' • '+backupDate(parsed.exportedAt):''));
+   }catch(error){alert('Backup inválido. Nenhum dado foi alterado.');}
+   finally{input.value='';}
+ };
+ reader.onerror=()=>{if(sequence===backupReadSequence){input.value='';alert('Não foi possível ler o arquivo. Nenhum dado foi alterado.');}};
+ reader.readAsText(file);
 }
 
 function csvEscape(value){
@@ -3927,17 +4085,14 @@ function exportCSV(){
 }
 
 function resetAll(){
-  const first=confirm('Tem certeza que deseja limpar TODOS os dados do SAN Finance? Essa ação não poderá ser desfeita.');
+  if(storageBlocked){alert('Recupere seus dados em Backup e recuperação antes de limpar o aplicativo.');return;}
+  const first=confirm('Tem certeza que deseja limpar TODOS os registros do SAN Finance? Uma cópia local será preservada para desfazer.');
   if(!first) return;
   const second=confirm('Última confirmação: você já baixou um backup? Clique em OK para apagar tudo.');
   if(!second) return;
-  localStorage.removeItem(KEY);
-  storageBlocked=false;
   data=JSON.parse(JSON.stringify(defaultData));
-  save();
-  render();
+  if(!save('Registros limpos',{protect:true})){render();return;}
   show('home', document.querySelector('.tab'));
-  alert('Dados apagados com sucesso.');
 }
 function dueDateLabel(d, idx){
   const ym=addMonths(d.inicio, idx);
@@ -3971,13 +4126,12 @@ function saveDebtEdit(){
  const nome=document.getElementById('editDebtName').value.trim();
  const valor=Number(document.getElementById('editDebtAmount').value),dia=Number(document.getElementById('editDebtDue').value);
  if(!nome||!Number.isFinite(valor)||Finance.amount(valor)<=0||valor>1e10||!Number.isInteger(dia)||dia<1||dia>31){alert('Confira o nome, o valor e o dia (1 a 31).');return;}
- const previous=JSON.parse(JSON.stringify(d));
  // Freeze legacy paid amounts before changing a recurring bill or installment.
  d.paymentRecords=d.paymentRecords||{};
  const keys=d.fixa?(d.paidMonths||[]):(d.pagos||[]).map(String);
  for(const key of keys){if(!d.paymentRecords[key]){const month=d.fixa?key:addMonths(d.inicio,Number(key));d.paymentRecords[key]={date:dateISOForMonthDay(month,d.dia||10),value:Number(d.valor)};}}
  d.nome=nome;d.valor=Finance.amount(valor);d.dia=dia;
- if(!save()){Object.keys(d).forEach(k=>delete d[k]);Object.assign(d,previous);return;}
+ if(!save('Conta alterada')){render();return;}
  closeEditDebt();render();
 }
 function debtValueInMonth(d,month){
@@ -4019,12 +4173,12 @@ function payCreditInvoice(cardId,month=selectedMonth){
  if(!validDate(date)){alert('Data inválida.');return;}
  if(!confirm('Registrar pagamento de '+fmt(value)+'?'))return;
  const movId=uid();data.movs.unshift({id:movId,tipo:'gasto',nome:'Fatura '+card.nome,valor:value,cat:'💳 Cartão',ym:date.slice(0,7),date:date.split('-').reverse().join('/'),cardId,invoiceMonth:month});
- data.creditInvoicePayments.push({id:uid(),cardId,ym:month,valor:value,movId,paidAt:date});save();render();
+ data.creditInvoicePayments.push({id:uid(),cardId,ym:month,valor:value,movId,paidAt:date});save('Fatura paga');render();
 }
 function undoCreditInvoice(cardId,month=selectedMonth){
  if(!confirm('Desmarcar todos os pagamentos desta fatura e remover as saídas vinculadas?'))return;
  const ids=data.creditInvoicePayments.filter(p=>p.cardId===cardId&&p.ym===month).map(p=>p.movId);
- data.movs=data.movs.filter(m=>!ids.includes(m.id));data.creditInvoicePayments=data.creditInvoicePayments.filter(p=>!(p.cardId===cardId&&p.ym===month));save();render();
+ data.movs=data.movs.filter(m=>!ids.includes(m.id));data.creditInvoicePayments=data.creditInvoicePayments.filter(p=>!(p.cardId===cardId&&p.ym===month));save('Pagamento da fatura desmarcado');render();
 }
 function addCreditCard(){
   const nome=cardNome.value.trim();
@@ -4036,9 +4190,10 @@ function addCreditCard(){
   if(!fech||fech<1||fech>31) fech=1;
   if(!data.creditCards) data.creditCards=[];
   data.creditCards.unshift({id:uid(),nome,limite,vencimento:venc,fechamento:fech});
+  if(!save('Cartão cadastrado')){render();return;}
   cardNome.value='';cardLimite.value='';cardVencimento.value='';cardFechamento.value='';
   const fc=document.getElementById('formCardCadastro'); if(fc) fc.classList.remove('open');
-  save();render();
+  render();
 }
 function addCreditPurchase(){
   if(!data.creditCards||data.creditCards.length===0){alert('Cadastre um cartão primeiro.');return}
@@ -4052,9 +4207,10 @@ function addCreditPurchase(){
   if(!nome||!Number.isFinite(valor)||valor<=0){alert('Preenche nome e valor da compra.');return}
   if(!data.creditPurchases) data.creditPurchases=[];
   data.creditPurchases.unshift({id:uid(),cardId,nome,valor,parcelas,inicio,pagas:[]});
+  if(!save('Compra cadastrada')){render();return;}
   purchaseNome.value='';purchaseValor.value='';purchaseParcelas.value='';purchaseInicio.value=nowMonth();
   const fc=document.getElementById('formCompraCartao'); if(fc) fc.classList.remove('open');
-  save();render();
+  render();
 }
 function delCreditCard(id){
  if(data.creditInvoicePayments.some(p=>p.cardId===id)){alert('Este cartão possui pagamentos. Preserve o histórico ou desmarque-os antes de apagar.');return;}
@@ -4064,12 +4220,12 @@ function delCreditCard(id){
   data.creditInvoicePayments=(data.creditInvoicePayments||[]).filter(p=>p.cardId!==id);
   data.creditCards=(data.creditCards||[]).filter(c=>c.id!==id);
   data.creditPurchases=(data.creditPurchases||[]).filter(p=>p.cardId!==id);
-  save();render();
+  save('Cartão apagado');render();
 }
 function delCreditPurchase(id){
  const p=data.creditPurchases.find(p=>p.id===id);if(!p)return;
  for(let i=0;i<p.parcelas;i++)if(Finance.invoicePaid(data,p.cardId,addMonths(p.inicio,i))>0){alert('Desmarque as faturas pagas desta compra antes de apagá-la.');return;}
- if(confirm('Apagar essa compra do cartão?')){data.creditPurchases=data.creditPurchases.filter(p=>p.id!==id);save();render();}
+ if(confirm('Apagar essa compra do cartão?')){data.creditPurchases=data.creditPurchases.filter(p=>p.id!==id);save('Compra apagada');render();}
 }
 function cardStatus(card,month=selectedMonth){
   const invoice=creditMonthAmount(card.id,month);
@@ -4603,6 +4759,7 @@ function simulatePurchase(){
 }
 
 function render(){
+  renderDataRecovery();
   renderSalaryReceipts();
   const historyBtn=document.getElementById('allMovementsBtn');
   if(historyBtn){historyBtn.hidden=movsInMonth(selectedMonth).length<=5;historyBtn.textContent=showAllMovements?'Mostrar menos':'Ver histórico completo';}
@@ -5063,9 +5220,11 @@ function validMonth(v){return /^\d{4}-(0[1-9]|1[0-2])$/.test(v||'');}
 function validDate(v){return /^\d{4}-\d{2}-\d{2}$/.test(v||'')&&!Number.isNaN(new Date(v+'T12:00:00').getTime())&&new Date(v+'T12:00:00').toISOString().slice(0,10)===v;}
 function validateBackup(d){
  if(!d||Array.isArray(d)||typeof d!=='object'||!Array.isArray(d.movs)||!Array.isArray(d.debts)||!Array.isArray(d.jobs)||!Array.isArray(d.wishes))throw Error('Formato inválido');
- const copy=JSON.parse(JSON.stringify(d));
+ const copy=JSON.parse(JSON.stringify(d,(key,value)=>{if(typeof value==='number'&&!Number.isFinite(value))throw Error('Valor inválido');return value;}));
  const arrays=['movs','debts','jobs','wishes','creditCards','creditPurchases','creditInvoicePayments'];
- const money=(o,key,optional=false)=>{if(optional&&o[key]===undefined)return;o[key]=Number(o[key]);if(!Number.isFinite(o[key])||o[key]<0||o[key]>1e10)throw Error('Valor inválido');};
+ const money=(o,key,optional=false)=>{if(optional&&o[key]===undefined)return;const value=o[key];if(value===null||typeof value==='boolean'||typeof value==='object'||(typeof value==='string'&&!value.trim()))throw Error('Valor inválido');o[key]=Number(value);if(!Number.isFinite(o[key])||o[key]<0||o[key]>1e10)throw Error('Valor inválido');};
+ money(copy,'salario',true);
+ if(copy.paySettings!==undefined){if(!copy.paySettings||typeof copy.paySettings!=='object'||Array.isArray(copy.paySettings))throw Error('Salários inválidos');money(copy.paySettings,'day5',true);money(copy.paySettings,'day20',true);}
  for(const a of arrays){if(copy[a]===undefined)copy[a]=[];if(!Array.isArray(copy[a]))throw Error('Lista inválida');for(const x of copy[a]){if(!x||typeof x!=='object'||Array.isArray(x))throw Error('Registro inválido');if(x.id&&!/^[\w-]+$/.test(String(x.id)))throw Error('Identificador inválido');}}
  for(const m of copy.movs){money(m,'valor');if(!['entrada','gasto'].includes(m.tipo)||!validMonth(m.ym||movMonth(m)))throw Error('Movimento inválido');m.nome=String(m.nome||'');m.cat=String(m.cat||'');}
  for(const d of copy.debts){money(d,'valor');if(!validMonth(d.inicio))throw Error('Mês inválido');d.dia=Number(d.dia||10);if(!Number.isInteger(d.dia)||d.dia<1||d.dia>31)throw Error('Dia inválido');d.meses=Number(d.meses||1);if(!Number.isInteger(d.meses)||d.meses<1||d.meses>600)throw Error('Parcelas inválidas');d.pagos=d.pagos||[];d.paidMonths=d.paidMonths||[];if(!Array.isArray(d.pagos)||!Array.isArray(d.paidMonths)||d.pagos.some(i=>!Number.isInteger(i)||i<0||i>=d.meses)||d.paidMonths.some(m=>!validMonth(m)))throw Error('Pagamentos inválidos');d.pagos=[...new Set(d.pagos)];d.paidMonths=[...new Set(d.paidMonths)];d.nome=String(d.nome||'');if(d.paymentRecords){for(const r of Object.values(d.paymentRecords)){if(!validDate(r.date))throw Error('Pagamento inválido');money(r,'value');}}}
@@ -5079,7 +5238,7 @@ function validateBackup(d){
 function savePaySettings(){
  const a=Number(document.getElementById('salary5').value),b=Number(document.getElementById('salary20').value);
  if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<0){alert('Digite valores válidos.');return;}
- data.paySettings={day5:Finance.amount(a),day20:Finance.amount(b)};if(save()){render();alert('Salários previstos salvos.');}
+ data.paySettings={day5:Finance.amount(a),day20:Finance.amount(b)};save('Salários atualizados');render();
 }
 function receiveSalary(day){
  const key=selectedMonth+'-'+day;if(data.movs.some(m=>m.salaryKey===key)){alert('Recebimento já registrado.');return;}
@@ -5087,24 +5246,28 @@ function receiveSalary(day){
  const raw=prompt('Valor realmente recebido em R$',String(expected).replace('.',','));if(raw===null)return;
  const value=Number(raw.replace(',','.'));if(!Number.isFinite(value)||value<=0){alert('Valor inválido.');return;}
  const date=prompt('Data do recebimento (AAAA-MM-DD)',Finance.localDate());if(date===null)return;if(!validDate(date)){alert('Data inválida.');return;}
- data.movs.unshift({id:uid(),tipo:'entrada',nome:'Salário • dia '+day,valor:Finance.amount(value),cat:'💰 Salário',ym:date.slice(0,7),date:date.split('-').reverse().join('/'),salaryKey:key});save();render();
+ data.movs.unshift({id:uid(),tipo:'entrada',nome:'Salário • dia '+day,valor:Finance.amount(value),cat:'💰 Salário',ym:date.slice(0,7),date:date.split('-').reverse().join('/'),salaryKey:key});save('Salário recebido');render();
 }
 function reconcileBalance(){
  const raw=prompt('Saldo real total de hoje, incluindo dinheiro guardado nas metas (R$):');if(raw===null)return;
  const value=Number(raw.replace(',','.'));if(!Number.isFinite(value)||value<0){alert('Valor inválido.');return;}
  const difference=Finance.amount(value-totals(nowMonth()).saldo);if(!difference){alert('O saldo já confere.');return;}
  if(!confirm('Registrar ajuste de '+fmt(difference)+' para o saldo passar a '+fmt(value)+'?'))return;
- data.movs.unshift({id:uid(),tipo:difference>0?'entrada':'gasto',nome:'Ajuste de saldo conferido',valor:Math.abs(difference),cat:'⚖ Ajuste',ym:nowMonth(),date:Finance.localDate().split('-').reverse().join('/')});save();render();
+ data.movs.unshift({id:uid(),tipo:difference>0?'entrada':'gasto',nome:'Ajuste de saldo conferido',valor:Math.abs(difference),cat:'⚖ Ajuste',ym:nowMonth(),date:Finance.localDate().split('-').reverse().join('/')});save('Saldo ajustado');render();
 }
 function withdrawWish(id){
  const w=data.wishes.find(w=>w.id===id);if(!w)return;
  const raw=prompt('Quanto deseja liberar desta reserva?');if(raw===null)return;
  const v=Number(raw.replace(',','.'));if(!Number.isFinite(v)||v<=0||v>w.guardado){alert('Valor inválido ou maior que a reserva.');return;}
- w.guardado=Finance.amount(w.guardado-v);save();render();
+ w.guardado=Finance.amount(w.guardado-v);save('Reserva retirada');render();
 }
 function downloadOriginal(){
- const raw=localStorage.getItem(KEY);if(!raw){alert('Não há dados locais.');return;}
- const blob=new Blob([raw],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='san-dados-originais.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ return downloadLocalCopy('');
+}
+function downloadLocalCopy(suffix){
+ if(!['','_previous','_beforeImport','_beforeV7'].includes(suffix))return false;
+ try{const raw=localStorage.getItem(KEY+suffix);if(!raw){alert('Não há dados nessa cópia.');return false;}downloadJSON(raw,'san-dados-preservados-'+backupFileStamp()+'.json');return true;}
+ catch(error){alert('Não foi possível baixar os dados preservados.');return false;}
 }
 function dashboardCategories(month){
  const sums=new Map();
