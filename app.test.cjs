@@ -76,6 +76,55 @@ assert.match(a.ctx.debtList.innerHTML,/Nenhuma conta com vencimento no dia 20/);
 a.run("setDebtDayFilter('all')");assert.match(a.ctx.debtList.innerHTML,/Conta cinco/);
 console.log('PASS: due-day filters and accessible button state; matching summaries; all accounts restored; financial data and global projections preserved; payments, edits, month changes and empty filter');
 
+// A carried-over statement is replaced in one save, while settled statements stay in history.
+const statementFixture={
+ movs:[],debts:[],jobs:[],wishes:[],
+ creditCards:[{id:'card',nome:'Cartão teste',limite:420,vencimento:8,fechamento:23}],
+ creditPurchases:[{id:'statement',cardId:'card',nome:'Fatura',valor:239.51,parcelas:1,inicio:'2026-09',pagas:[]}]
+};
+const invoiceStorageKey='sanFinancePro_v6_fixas';
+const invoiceInputs="editInvoiceAmount.value='420';editInvoiceClosingDay.value='25';editInvoiceDueDay.value='4'";
+a=app(JSON.stringify(statementFixture));
+a.run("selectedMonth='2026-10';render();openCreditInvoiceEdit('card','statement')");
+assert.match(a.ctx.purchaseList.innerHTML,/Corrigir fatura/);
+assert.equal(a.ctx.editInvoiceMonth.value,'2026-10');
+assert.match(a.ctx.editInvoiceHint.textContent,/239,51/);
+const initialStatement=a.storage.get(invoiceStorageKey);
+a.run(invoiceInputs+";editInvoiceDueDay.value='0';saveCreditInvoiceEdit()");
+assert.equal(a.storage.get(invoiceStorageKey),initialStatement);
+a.run(invoiceInputs+';saveCreditInvoiceEdit()');
+assert.equal(a.run('data.creditPurchases.length'),1);
+assert.equal(a.run("creditMonthAmount('card','2026-09')"),0);
+assert.equal(a.ctx.quickCardInvoice.textContent,'R$ 420,00');
+assert.equal(a.ctx.quickCardUsed.textContent,'R$ 420,00');
+assert.equal(a.ctx.quickCardAvailable.textContent,'R$ 0,00');
+assert.equal(a.run('projectionForMonth().openCard'),420);
+assert.equal(a.run('totals().saida'),0);
+assert.match(a.ctx.cardList.innerHTML,/vence dia 04[\s\S]*fecha dia 25/);
+assert.equal(a.run("financeEvents().find(e=>e.type==='cardevt').date"),'2026-10-04');
+a.run('undoLastChange()');
+assert.equal(a.run("creditMonthAmount('card','2026-09')"),239.51);
+assert.equal(a.run('data.creditCards[0].vencimento'),8);
+assert.equal(a.run('data.creditCards[0].fechamento'),23);
+
+const settledStatement={...statementFixture,
+ movs:[{id:'paid',tipo:'gasto',nome:'Pagamento',valor:239.51,ym:'2026-09'}],
+ creditInvoicePayments:[{id:'payment',cardId:'card',ym:'2026-09',valor:239.51,movId:'paid',paidAt:'2026-09-08'}]
+};
+a=app(JSON.stringify(settledStatement));
+a.run("selectedMonth='2026-10';render();openCreditInvoiceEdit('card','statement')");
+assert.match(a.ctx.purchaseList.innerHTML,/Faturas pagas de outros meses/);
+assert.equal(a.ctx.editInvoiceModal.classList.contains('open'),false);
+a.run("openCreditInvoiceEdit('card');"+invoiceInputs+';saveCreditInvoiceEdit()');
+assert.equal(a.ctx.quickCardUsed.textContent,'R$ 420,00');
+assert.equal(a.run("totals('2026-09').saida"),239.51);
+assert.equal(a.run('data.creditInvoicePayments[0].movId'),'paid');
+const registeredStatement=a.storage.get(invoiceStorageKey);
+a.run("openCreditInvoiceEdit('card');"+invoiceInputs+';saveCreditInvoiceEdit()');
+assert.equal(a.storage.get(invoiceStorageKey),registeredStatement);
+assert.match(a.alerts.at(-1),/já tem outros lançamentos/);
+console.log('PASS: correcting a statement updates its month and card dates together; paid history and duplicate protection');
+
 async function checkRecoveryFlows(){
  const key='sanFinancePro_v6_fixas';
  const fixture={salario:0,movs:[

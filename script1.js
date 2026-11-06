@@ -556,7 +556,7 @@ function showUndoNotice(message){
 function undoLastChange(){
  const result=dataStore.undo();
  if(applyStoredResult(result,result.action==='redo'?'Alteração refeita':'Alteração desfeita')){
-   closeEditMovModal();closeEditDebt();closeBackupRestore();
+   closeEditMovModal();closeEditDebt();closeBackupRestore();closeCreditInvoiceEdit();
  }
  render();
 }
@@ -810,6 +810,92 @@ function invoicePayment(cardId,month){
   return (data.creditInvoicePayments||[]).find(p=>p.cardId===cardId && p.ym===month);
 }
 function invoiceIsPaid(cardId,month){return creditMonthAmount(cardId,month)>0 && Finance.invoiceOpen(data,cardId,month)===0}
+
+let creditInvoiceDraft=null;
+function isSingleInvoice(purchase){
+  return Number(purchase.parcelas)===1 && /^fatura(?:\s|$)/i.test(String(purchase.nome||'').trim());
+}
+function hasRecordedInvoicePayment(purchase){
+  return Boolean(invoicePayment(purchase.cardId,purchase.inicio)) ||
+    (Array.isArray(purchase.pagas) && purchase.pagas.length>0);
+}
+function openCreditInvoiceEdit(cardId,purchaseId=null){
+  const card=data.creditCards.find(item=>item.id===cardId);
+  const purchase=data.creditPurchases.find(item=>item.id===purchaseId && item.cardId===cardId);
+  if(!card || (purchaseId && (!purchase || !isSingleInvoice(purchase)))) return;
+  if(purchase && hasRecordedInvoicePayment(purchase)){
+    alert('Esta fatura tem pagamento registrado. Abra o cartão e toque em Lançar fatura para registrar a próxima.');
+    return;
+  }
+
+  creditInvoiceDraft={cardId,purchaseId,token:dataStore.token()};
+  document.getElementById('editInvoiceCardName').textContent=card.nome;
+  document.getElementById('editInvoiceTitle').textContent=purchase?'Corrigir fatura':'Lançar fatura';
+  document.getElementById('editInvoiceAmount').value=purchase?purchase.valor:'';
+  document.getElementById('editInvoiceMonth').value=selectedMonth;
+  document.getElementById('editInvoiceClosingDay').value=card.fechamento||1;
+  document.getElementById('editInvoiceDueDay').value=card.vencimento||10;
+  const hint=document.getElementById('editInvoiceHint');
+  hint.hidden=!purchase;
+  hint.textContent=purchase?`Substitui a fatura de ${fmt(purchase.valor)} de ${monthName(purchase.inicio)}.`:'';
+  document.getElementById('editInvoiceModal').classList.add('open');
+}
+function closeCreditInvoiceEdit(){
+  creditInvoiceDraft=null;
+  document.getElementById('editInvoiceModal').classList.remove('open');
+}
+function saveCreditInvoiceEdit(){
+  const draft=creditInvoiceDraft;
+  if(!draft) return;
+  if(draft.token!==dataStore.token()){
+    closeCreditInvoiceEdit();
+    alert('Seus dados mudaram. Abra a fatura novamente para corrigir.');
+    return;
+  }
+
+  const card=data.creditCards.find(item=>item.id===draft.cardId);
+  const purchase=data.creditPurchases.find(item=>item.id===draft.purchaseId && item.cardId===draft.cardId);
+  if(!card || (draft.purchaseId && (!purchase || !isSingleInvoice(purchase) || hasRecordedInvoicePayment(purchase)))){
+    closeCreditInvoiceEdit();
+    alert('Confira o cartão e os pagamentos antes de corrigir a fatura.');
+    return;
+  }
+
+  const amount=Number(document.getElementById('editInvoiceAmount').value);
+  const month=document.getElementById('editInvoiceMonth').value;
+  const closingDay=Number(document.getElementById('editInvoiceClosingDay').value);
+  const dueDay=Number(document.getElementById('editInvoiceDueDay').value);
+  if(!Number.isFinite(amount) || Finance.amount(amount)<=0 || amount>1e10 || !validMonth(month)){
+    alert('Confira o valor e o mês de vencimento da fatura.');
+    return;
+  }
+  if(![closingDay,dueDay].every(day=>Number.isInteger(day) && day>=1 && day<=31)){
+    alert('Informe os dias de fechamento e vencimento, de 1 a 31.');
+    return;
+  }
+
+  const amountBeingReplaced=purchase && purchase.inicio===month?purchase.valor:0;
+  const hasOtherPurchases=Finance.cents(creditMonthAmount(card.id,month))!==Finance.cents(amountBeingReplaced);
+  if(hasOtherPurchases || invoicePayment(card.id,month)){
+    alert('Este mês já tem outros lançamentos ou pagamentos. Confira a fatura antes de lançar o total.');
+    return;
+  }
+
+  card.fechamento=closingDay;
+  card.vencimento=dueDay;
+  const fields={valor:Finance.amount(amount),inicio:month};
+  if(purchase) Object.assign(purchase,fields);
+  else data.creditPurchases.unshift({id:uid(),cardId:card.id,nome:'Fatura',parcelas:1,pagas:[],...fields});
+
+  if(!save(purchase?'Fatura corrigida':'Fatura registrada')){
+    if(draft.token!==dataStore.token()) closeCreditInvoiceEdit();
+    render();
+    return;
+  }
+  closeCreditInvoiceEdit();
+  setSelectedMonth(month);
+}
+
 function payCreditInvoice(cardId,month=selectedMonth){
  const card=data.creditCards.find(c=>c.id===cardId);if(!card)return;
  const value=Finance.invoiceOpen(data,cardId,month);if(value<=0)return;
@@ -1011,6 +1097,8 @@ function renderCreditCards(){
 
       ${payBtn}
 
+      <button class="ghost" onclick="openCreditInvoiceEdit('${c.id}')">Lançar fatura</button>
+
       <button
         class="ghost danger"
         onclick="delCreditCard('${c.id}')">
@@ -1027,14 +1115,18 @@ function renderCreditCards(){
 
   if(typeof purchaseList!=='undefined'){
     const purchases=[...(data.creditPurchases||[])].sort((a,b)=>String(b.inicio||'').localeCompare(String(a.inicio||'')));
-    purchaseList.innerHTML=purchases.map(p=>{
+    const currentRows=[];
+    const paidHistory=[];
+    for(const p of purchases){
       const card=data.creditCards.find(c=>c.id===p.cardId);
       const parcelas=Math.max(1,parseInt(p.parcelas)||1);
       const valorParcela=Finance.installment(p,0);
       const fim=addMonths(p.inicio,parcelas-1);
       const active=monthsBetween(p.inicio,selectedMonth)>=0 && monthsBetween(p.inicio,selectedMonth)<parcelas;
       const installment=active?monthsBetween(p.inicio,selectedMonth)+1:null;
-      return `
+      const singleInvoice=isSingleInvoice(p);
+      const canCorrect=card && singleInvoice && !hasRecordedInvoicePayment(p);
+      const row=`
 <details
   class="purchaseCompact"
   style="${active?'':'opacity:.65'}">
@@ -1120,6 +1212,8 @@ function renderCreditCards(){
 
     <div class="purchaseActions">
 
+      ${canCorrect?`<button class="ghost" onclick="openCreditInvoiceEdit('${p.cardId}','${p.id}')">Corrigir fatura</button>`:''}
+
       <button
         class="ghost danger"
         onclick="delCreditPurchase('${p.id}')">
@@ -1131,7 +1225,13 @@ function renderCreditCards(){
   </div>
 
 </details>`
-    }).join('')||'<div class="empty">Nenhuma compra parcelada cadastrada.</div>';
+      if(singleInvoice && p.inicio<selectedMonth && invoiceIsPaid(p.cardId,p.inicio)) paidHistory.push(row);
+      else currentRows.push(row);
+    }
+    if(paidHistory.length){
+      currentRows.push(`<details class="card simpleDetails"><summary>Faturas pagas de outros meses</summary>${paidHistory.join('')}</details>`);
+    }
+    purchaseList.innerHTML=currentRows.join('')||'<div class="empty">Nenhum lançamento no cartão.</div>';
   }
 }
 
