@@ -100,7 +100,7 @@ assert.equal(a.ctx.quickCardUsed.textContent,'R$ 420,00');
 assert.equal(a.ctx.quickCardAvailable.textContent,'R$ 0,00');
 assert.equal(a.run('projectionForMonth().openCard'),420);
 assert.equal(a.run('totals().saida'),0);
-assert.match(a.ctx.cardList.innerHTML,/vence dia 04[\s\S]*fecha dia 25/);
+assert.match(a.ctx.cardList.innerHTML,/25\/09[\s\S]*Vence em 04\/10/);
 assert.equal(a.run("financeEvents().find(e=>e.type==='cardevt').date"),'2026-10-04');
 a.run('undoLastChange()');
 assert.equal(a.run("creditMonthAmount('card','2026-09')"),239.51);
@@ -124,6 +124,45 @@ a.run("openCreditInvoiceEdit('card');"+invoiceInputs+';saveCreditInvoiceEdit()')
 assert.equal(a.storage.get(invoiceStorageKey),registeredStatement);
 assert.match(a.alerts.at(-1),/já tem outros lançamentos/);
 console.log('PASS: correcting a statement updates its month and card dates together; paid history and duplicate protection');
+
+const billingFixture={
+ debts:[],jobs:[],wishes:[],
+ movs:[
+   {id:'income',tipo:'entrada',valor:500,ym:'2026-11'},
+   {id:'nov-payment',tipo:'gasto',valor:180,ym:'2026-11',cardId:'card',invoiceMonth:'2026-11'}
+ ],
+ creditCards:[{id:'card',nome:'Cartão teste',limite:500,vencimento:3,fechamento:26}],
+ creditPurchases:[
+   {id:'nov',cardId:'card',nome:'Fatura',valor:180,parcelas:1,inicio:'2026-11'},
+   {id:'dec',cardId:'card',nome:'Compra',valor:75,parcelas:1,inicio:'2026-12'}
+ ],
+ creditInvoicePayments:[{id:'paid-nov',cardId:'card',ym:'2026-11',valor:180,movId:'nov-payment',paidAt:'2026-11-03'}]
+};
+a=app(JSON.stringify(billingFixture));
+a.run("Finance.localDate=()=> '2026-11-12';setSelectedMonth('2026-11')");
+assert.match(a.ctx.cardList.innerHTML,/creditStatus paid">● PAGA/);
+assert.match(a.ctx.nextCardInvoices.innerHTML,/setSelectedMonth\('2026-12'\)[\s\S]*Vence em 03\/12[\s\S]*R\$ 75,00/);
+assert.equal(a.run('projectionForMonth().openCard'),0);
+a.run("setSelectedMonth('2026-12')");
+assert.match(a.ctx.cardList.innerHTML,/Fecha em 26\/11[\s\S]*Vence em 03\/12[\s\S]*creditStatus open">● ABERTA/);
+assert.equal(a.run("cardStatus(data.creditCards[0],selectedMonth,'2026-11-25').status"),'open');
+a.run("Finance.localDate=()=> '2026-11-26';render()");
+assert.match(a.ctx.cardList.innerHTML,/Fechou em 26\/11[\s\S]*creditStatus closed">● FECHADA/);
+assert.equal(a.run("cardStatus(data.creditCards[0],selectedMonth,'2026-12-03').status"),'closed');
+assert.equal(a.run("cardStatus(data.creditCards[0],selectedMonth,'2026-12-04').status"),'overdue');
+assert.equal(a.run('totals().saldo'),320);
+a.run("Finance.localDate=()=> '2026-11-12';setSelectedMonth('2026-11');purchaseCard.value='card';toggleFormCard('formCompraCartao')");
+assert.equal(a.ctx.purchaseInicio.value,'2026-12');
+assert.match(a.ctx.purchaseInvoiceHint.textContent,/26\/11[\s\S]*03\/12/);
+const beforeWrongMonth=a.storage.get(invoiceStorageKey);
+a.run("purchaseNome.value='Compra de teste';purchaseValor.value='20';purchaseInicio.value='2026-11';addCreditPurchase()");
+assert.equal(a.storage.get(invoiceStorageKey),beforeWrongMonth);
+assert.match(a.alerts.at(-1),/ajuste o mês da primeira fatura/);
+a.run("purchaseInicio.value='2026-12';addCreditPurchase()");
+assert.equal(a.run("Finance.invoiceOpen(data,'card','2026-12')"),95);
+assert.equal(a.run("data.creditInvoicePayments[0].movId"),'nov-payment');
+assert.equal(a.run('totals().saldo'),320);
+console.log('PASS: invoice labels follow closing and due dates; next invoice is separate; new purchases preserve payment history');
 
 async function checkRecoveryFlows(){
  const key='sanFinancePro_v6_fixas';

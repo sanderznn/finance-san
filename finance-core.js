@@ -5,6 +5,24 @@
   const ym=d=>String(d||'').slice(0,7);
   const add=(m,n)=>{const [y,k]=m.split('-').map(Number);const d=new Date(y,k-1+n,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;};
   const localDate=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+  function dateForMonthDay(month,day){
+    const [year,number]=month.split('-').map(Number);
+    const last=new Date(year,number,0).getDate();
+    const date=Math.min(Math.max(1,parseInt(day,10)||1),last);
+    return `${month}-${String(date).padStart(2,'0')}`;
+  }
+  function invoiceDates(card,month){
+    const dueDay=Number(card.vencimento)||10;
+    const closingDay=Number(card.fechamento)||1;
+    const closingMonth=closingDay>dueDay?add(month,-1):month;
+    return {closesOn:dateForMonthDay(closingMonth,closingDay),dueOn:dateForMonthDay(month,dueDay)};
+  }
+  function suggestedInvoiceMonth(data,card,today=localDate()){
+    let month=ym(today);
+    const recordedMonths=new Set((data.creditInvoicePayments||[]).filter(p=>p.cardId===card.id).map(p=>p.ym));
+    while(today>=invoiceDates(card,month).closesOn||recordedMonths.has(month)) month=add(month,1);
+    return month;
+  }
   const paid=j=>String(j.status||'').toLowerCase()==='pago';
   const movMonth=m=>m.ym||(String(m.date||'').split('/').reverse().join('-').slice(0,7));
   const jobMonth=j=>j.paidMonth||ym(j.paidAt)||ym(j.dataEvento);
@@ -25,5 +43,5 @@
     for(const c of d.creditCards||[]){const months=new Set([month]);for(const p of (d.creditPurchases||[]).filter(p=>p.cardId===c.id))for(let i=0;i<p.parcelas;i++){const m=add(p.inicio,i);if(m<=month)months.add(m);}for(const m of months){const total=invoice(d,c.id,m),open=invoiceOpen(d,c.id,m);if(total&&(m===month||open>0))rows.push({kind:'card',id:c.id,month:m,day:c.vencimento,name:'Fatura '+c.nome,value:open||total,paid:open===0});}}
     return rows.sort((a,b)=>(a.month+String(a.day).padStart(2,'0')).localeCompare(b.month+String(b.day).padStart(2,'0')));
   }
-  root.Finance={cents,amount,add,localDate,installment,invoice,invoicePaid,invoiceOpen,used,totals,obligations,jobMonth};
+  root.Finance={cents,amount,add,localDate,dateForMonthDay,invoiceDates,suggestedInvoiceMonth,installment,invoice,invoicePaid,invoiceOpen,used,totals,obligations,jobMonth};
 })(typeof module==='object'?module.exports:globalThis);
