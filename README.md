@@ -12,7 +12,9 @@ Aplicativo pessoal em português, com armazenamento local no navegador. A versã
 - Ao pagar contas, faturas ou receber jobs, informe a data real. O mês do evento ou do vencimento não determina o mês de caixa.
 - Saldo acumulado inclui entradas e saídas dos meses anteriores. Confira o total em Configurações → Conferir saldo real se seu histórico anterior estiver incompleto.
 - Metas representam dinheiro já incluído no saldo total. Esse valor fica separado do disponível para gastar; retirar uma reserva apenas libera o valor, sem criar entrada de dinheiro.
-- Cartões só liberam limite após o pagamento registrado. Parcelas distribuem os centavos sem perder diferença. Compras de faturas já pagas precisam ter o pagamento desmarcado antes de serem alteradas.
+- Cartões só liberam limite após o pagamento registrado. Parcelas distribuem os centavos sem perder diferença. Compras e cartões com pagamentos vinculados ficam protegidos para preservar o histórico.
+- Em Cartões, o mês selecionado é o do vencimento da fatura. Se o dia de fechamento for maior que o dia de vencimento, a fatura fecha no mês anterior. O status segue as datas configuradas no cartão e os pagamentos registrados. No mês atual, o atalho **Próxima fatura** abre o mês seguinte.
+- Ao lançar uma compra, confira o mês de vencimento da primeira fatura sugerido pelo app. Se já houver pagamento registrado no mês escolhido, selecione o vencimento indicado no app do cartão.
 
 ## Atualização e recuperação
 

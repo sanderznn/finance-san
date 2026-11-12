@@ -6,5 +6,13 @@ d=base();d.creditCards=[{id:'c',vencimento:6}];d.creditPurchases=[{cardId:'c',va
 d.creditInvoicePayments=[{cardId:'c',ym:'2026-10',valor:33.34}];assert.equal(F.used(d,'c'),66.66);d.creditPurchases.push({cardId:'c',valor:50,parcelas:1,inicio:'2026-10'});assert.equal(F.invoiceOpen(d,'c','2026-10'),50);assert.equal(F.obligations(d,'2026-11').filter(r=>r.month==='2026-10')[0].value,50);
 d=base();d.debts=[{id:'x',nome:'Conta',valor:100,meses:1,inicio:'2026-10',pagos:[0],paymentRecords:{0:{date:'2026-11-01',value:100}}}];assert.equal(F.totals(d,'2026-10').saida,0);assert.equal(F.totals(d,'2026-11').saida,100);
 assert.equal(F.add('2026-01',-1),'2025-12');
+const billingCard={id:'c',fechamento:26,vencimento:3};
+assert.deepEqual(F.invoiceDates(billingCard,'2026-12'),{closesOn:'2026-11-26',dueOn:'2026-12-03'});
+assert.deepEqual(F.invoiceDates(billingCard,'2027-01'),{closesOn:'2026-12-26',dueOn:'2027-01-03'});
+assert.deepEqual(F.invoiceDates({fechamento:31,vencimento:3},'2027-03'),{closesOn:'2027-02-28',dueOn:'2027-03-03'});
+assert.deepEqual(F.invoiceDates({fechamento:15,vencimento:20},'2026-12'),{closesOn:'2026-12-15',dueOn:'2026-12-20'});
+assert.equal(F.suggestedInvoiceMonth(base(),billingCard,'2026-11-12'),'2026-12');
+assert.equal(F.suggestedInvoiceMonth(base(),billingCard,'2026-11-26'),'2027-01');
+assert.equal(F.suggestedInvoiceMonth({creditInvoicePayments:[{cardId:'c',ym:'2026-12',valor:100}]},billingCard,'2026-11-12'),'2027-01');
 d=base();d.debts=[{id:'f',fixa:true,inicio:'2026-09',valor:70,paidMonths:[],dia:1}];assert.equal(F.obligations(d,'2026-11').length,3);
-console.log('PASS: carryover, receipt dates, cent rounding, unpaid limits, invoice differences, arrears, debt payment dates, year boundary');
+console.log('PASS: carryover, receipt dates, cent rounding, unpaid limits, billing dates, suggested invoice months, arrears and year boundary');

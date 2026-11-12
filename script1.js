@@ -351,7 +351,11 @@ function saveEditMov(){
 }
 
   function delMov(id){
-  if(!confirm('Apagar este lançamento?')) return;
+  const payment=(data.creditInvoicePayments||[]).find(p=>p.movId===id);
+  const message=payment
+    ? `Desfazer o registro de pagamento de ${fmt(payment.valor)}? A fatura voltará a ficar pendente e o valor voltará ao saldo do app.`
+    : 'Apagar este lançamento?';
+  if(!confirm(message)) return;
   data.movs=(data.movs||[]).filter(m=>m.id!==id);
   data.creditInvoicePayments=(data.creditInvoicePayments||[]).filter(p=>p.movId!==id);
   (data.jobs||[]).forEach(j=>{if(Array.isArray(j.costs)) j.costs=j.costs.map(c=>c.movId===id?Object.assign({},c,{movId:''}):c)});
@@ -901,14 +905,17 @@ function payCreditInvoice(cardId,month=selectedMonth){
  const value=Finance.invoiceOpen(data,cardId,month);if(value<=0)return;
  const date=prompt('Data do pagamento (AAAA-MM-DD)',Finance.localDate());if(date===null)return;
  if(!validDate(date)){alert('Data inválida.');return;}
- if(!confirm('Registrar pagamento de '+fmt(value)+'?'))return;
+ if(!confirm('Confirma que já pagou '+fmt(value)+' desta fatura?'))return;
  const movId=uid();data.movs.unshift({id:movId,tipo:'gasto',nome:'Fatura '+card.nome,valor:value,cat:'💳 Cartão',ym:date.slice(0,7),date:date.split('-').reverse().join('/'),cardId,invoiceMonth:month});
  data.creditInvoicePayments.push({id:uid(),cardId,ym:month,valor:value,movId,paidAt:date});save('Fatura paga');render();
 }
 function undoCreditInvoice(cardId,month=selectedMonth){
- if(!confirm('Desmarcar todos os pagamentos desta fatura e remover as saídas vinculadas?'))return;
- const ids=data.creditInvoicePayments.filter(p=>p.cardId===cardId&&p.ym===month).map(p=>p.movId);
- data.movs=data.movs.filter(m=>!ids.includes(m.id));data.creditInvoicePayments=data.creditInvoicePayments.filter(p=>!(p.cardId===cardId&&p.ym===month));save('Pagamento da fatura desmarcado');render();
+ const payments=data.creditInvoicePayments.filter(p=>p.cardId===cardId&&p.ym===month);
+ if(!payments.length)return;
+ const value=Finance.invoicePaid(data,cardId,month);
+ if(!confirm(`Desfazer o registro de ${fmt(value)} em pagamentos? A fatura voltará a ficar pendente e o valor voltará ao saldo do app.`))return;
+ const ids=new Set(payments.map(p=>p.movId));
+ data.movs=data.movs.filter(m=>!ids.has(m.id));data.creditInvoicePayments=data.creditInvoicePayments.filter(p=>!(p.cardId===cardId&&p.ym===month));save('Registro de pagamento desfeito');render();
 }
 function addCreditCard(){
   const nome=cardNome.value.trim();
@@ -925,25 +932,39 @@ function addCreditCard(){
   const fc=document.getElementById('formCardCadastro'); if(fc) fc.classList.remove('open');
   render();
 }
+function syncPurchaseInvoiceMonth(suggest=false){
+  const card=data.creditCards.find(c=>c.id===purchaseCard.value)||data.creditCards[0];
+  const hint=document.getElementById('purchaseInvoiceHint');
+  if(!card){hint.textContent='Cadastre um cartão primeiro.';return;}
+  if(suggest||!purchaseInicio.value) purchaseInicio.value=Finance.suggestedInvoiceMonth(data,card,Finance.localDate());
+  const month=purchaseInicio.value;
+  if(!validMonth(month)){hint.textContent='Escolha o mês em que vence a primeira fatura.';return;}
+  const {closesOn,dueOn}=Finance.invoiceDates(card,month);
+  hint.textContent=`Fechamento em ${prettyISO(closesOn)} · Vencimento em ${prettyISO(dueOn)}`;
+}
 function addCreditPurchase(){
-  if(!data.creditCards||data.creditCards.length===0){alert('Cadastre um cartão primeiro.');return}
-  const cardId=purchaseCard.value;
+  const card=data.creditCards.find(c=>c.id===purchaseCard.value);
+  if(!card){alert('Selecione o cartão da compra.');return;}
   const nome=purchaseNome.value.trim();
   const valor=parseFloat(purchaseValor.value);
   const parcelas=parseInt(purchaseParcelas.value)||1;
-  const inicio=purchaseInicio.value||nowMonth();
+  const inicio=purchaseInicio.value||Finance.suggestedInvoiceMonth(data,card,Finance.localDate());
   if(parcelas<1||parcelas>600||!validMonth(inicio)){alert('Confira o mês e as parcelas (1 a 600).');return;}
-  if((data.creditInvoicePayments||[]).some(p=>p.cardId===cardId&&p.ym>=inicio)){alert('Desmarque as faturas pagas afetadas antes de alterar as compras.');return;}
+  const lastInvoice=addMonths(inicio,parcelas-1);
+  if(data.creditInvoicePayments.some(p=>p.cardId===card.id&&p.ym>=inicio&&p.ym<=lastInvoice)){
+    alert('O período escolhido inclui uma fatura com pagamento registrado. Confira o vencimento no cartão e ajuste o mês da primeira fatura.');
+    return;
+  }
   if(!nome||!Number.isFinite(valor)||valor<=0){alert('Preenche nome e valor da compra.');return}
   if(!data.creditPurchases) data.creditPurchases=[];
-  data.creditPurchases.unshift({id:uid(),cardId,nome,valor,parcelas,inicio,pagas:[]});
+  data.creditPurchases.unshift({id:uid(),cardId:card.id,nome,valor,parcelas,inicio,pagas:[]});
   if(!save('Compra cadastrada')){render();return;}
-  purchaseNome.value='';purchaseValor.value='';purchaseParcelas.value='';purchaseInicio.value=nowMonth();
+  purchaseNome.value='';purchaseValor.value='';purchaseParcelas.value='';syncPurchaseInvoiceMonth(true);
   const fc=document.getElementById('formCompraCartao'); if(fc) fc.classList.remove('open');
   render();
 }
 function delCreditCard(id){
- if(data.creditInvoicePayments.some(p=>p.cardId===id)){alert('Este cartão possui pagamentos. Preserve o histórico ou desmarque-os antes de apagar.');return;}
+ if(data.creditInvoicePayments.some(p=>p.cardId===id)){alert('Este cartão tem pagamentos registrados e está protegido para preservar o histórico.');return;}
   if(!confirm('Apagar cartão e compras vinculadas a ele?')) return;
   const payIds=(data.creditInvoicePayments||[]).filter(p=>p.cardId===id).map(p=>p.movId).filter(Boolean);
   data.movs=(data.movs||[]).filter(m=>!payIds.includes(m.id));
@@ -954,32 +975,44 @@ function delCreditCard(id){
 }
 function delCreditPurchase(id){
  const p=data.creditPurchases.find(p=>p.id===id);if(!p)return;
- for(let i=0;i<p.parcelas;i++)if(Finance.invoicePaid(data,p.cardId,addMonths(p.inicio,i))>0){alert('Desmarque as faturas pagas desta compra antes de apagá-la.');return;}
+ for(let i=0;i<p.parcelas;i++)if(Finance.invoicePaid(data,p.cardId,addMonths(p.inicio,i))>0){alert('Esta compra faz parte de uma fatura com pagamento registrado. Confira o histórico do cartão.');return;}
  if(confirm('Apagar essa compra do cartão?')){data.creditPurchases=data.creditPurchases.filter(p=>p.id!==id);save('Compra apagada');render();}
 }
-function cardStatus(card,month=selectedMonth){
+function cardStatus(card,month=selectedMonth,today=Finance.localDate()){
   const invoice=creditMonthAmount(card.id,month);
-  const used=creditOutstanding(card.id,nowMonth());
-  const available=(parseFloat(card.limite)||0)-used;
-  const paid=invoiceIsPaid(card.id,month);
-  return {invoice,used,available,paid};
+  const remaining=Finance.invoiceOpen(data,card.id,month);
+  const used=creditOutstanding(card.id);
+  const available=Finance.amount(Number(card.limite||0)-used);
+  const {closesOn,dueOn}=Finance.invoiceDates(card,month);
+  const paid=invoice>0&&remaining===0;
+  let status='open';
+  if(!invoice) status='empty';
+  else if(paid) status='paid';
+  else if(today>dueOn) status='overdue';
+  else if(today>=closesOn) status='closed';
+  return {invoice,remaining,used,available,paid,status,closesOn,dueOn};
 }
+let lastCreditViewDate='';
 function renderCreditCards(){
   if(!data.creditCards) data.creditCards=[];
   if(!data.creditPurchases) data.creditPurchases=[];
   if(!data.creditInvoicePayments) data.creditInvoicePayments=[];
-  if(typeof purchaseInicio!=='undefined' && !purchaseInicio.value) purchaseInicio.value=selectedMonth||nowMonth();
+  const today=Finance.localDate();
+  lastCreditViewDate=today;
 
   if(typeof purchaseCard!=='undefined'){
+    const selectedCard=purchaseCard.value;
     purchaseCard.innerHTML=data.creditCards.length
       ? data.creditCards.map(c=>`<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('')
       : '<option value="">Cadastre um cartão primeiro</option>';
+    if(data.creditCards.some(c=>c.id===selectedCard)) purchaseCard.value=selectedCard;
+    syncPurchaseInvoiceMonth();
   }
 
-  const totalInvoice=data.creditCards.reduce((a,c)=>a+cardStatus(c,selectedMonth).invoice,0);
-  const totalUsed=data.creditCards.reduce((a,c)=>a+cardStatus(c,selectedMonth).used,0);
-  const totalLimit=data.creditCards.reduce((a,c)=>a+(parseFloat(c.limite)||0),0);
-  const totalAvailable=totalLimit-totalUsed;
+  const summaries=data.creditCards.map(card=>({card,statement:cardStatus(card,selectedMonth,today)}));
+  const totalInvoice=summaries.reduce((sum,{statement})=>sum+Finance.cents(statement.invoice),0)/100;
+  const totalUsed=summaries.reduce((sum,{statement})=>sum+Finance.cents(statement.used),0)/100;
+  const totalAvailable=summaries.reduce((sum,{statement})=>sum+Finance.cents(statement.available),0)/100;
 
   if(typeof cardInvoice!=='undefined'){
     cardInvoice.textContent=fmt(totalInvoice);
@@ -992,14 +1025,28 @@ function renderCreditCards(){
     quickCardAvailable.textContent=fmt(totalAvailable);
   }
 
+  const nextInvoiceList=document.getElementById('nextCardInvoices');
+  const nextMonth=addMonths(selectedMonth,1);
+  nextInvoiceList.innerHTML=selectedMonth===today.slice(0,7)
+    ? data.creditCards.map(c=>{
+      const remaining=Finance.invoiceOpen(data,c.id,nextMonth);
+      if(!remaining)return '';
+      const {dueOn}=Finance.invoiceDates(c,nextMonth);
+      return `<button class="ghost nextInvoice" type="button" onclick="setSelectedMonth('${nextMonth}')">
+        <span><b>Próxima fatura</b><small class="sub">${escapeHtml(c.nome)} · Vence em ${prettyISO(dueOn)}</small></span>
+        <strong class="yellow">${fmt(remaining)} ›</strong>
+      </button>`;
+    }).join('')
+    : '';
+
   if(typeof cardList!=='undefined'){
-    cardList.innerHTML=data.creditCards.map(c=>{
-      const s=cardStatus(c,selectedMonth);
+    const statusLabels={open:'ABERTA',closed:'FECHADA',overdue:'ATRASADA',paid:'PAGA',empty:'SEM LANÇAMENTOS'};
+    cardList.innerHTML=summaries.map(({card:c,statement:s})=>{
       const pct=c.limite?Math.min(100,Math.max(0,Math.round((s.used/c.limite)*100))):0;
       const payBtn=s.invoice>0
         ? (s.paid
-          ? `<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desmarcar pagamento</button>`
-          : `<button class="ghost" onclick="payCreditInvoice('${c.id}','${selectedMonth}')">Pagar restante</button>${invoicePayment(c.id,selectedMonth)?`<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desmarcar pagamentos</button>`:''}`)
+          ? `<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desfazer registro de pagamento</button>`
+          : `<button class="ghost" onclick="payCreditInvoice('${c.id}','${selectedMonth}')">Registrar pagamento</button>${invoicePayment(c.id,selectedMonth)?`<button class="ghost" onclick="undoCreditInvoice('${c.id}','${selectedMonth}')">Desfazer registros de pagamento</button>`:''}`)
         : '';
       return `
 <details class="creditCompact">
@@ -1011,9 +1058,9 @@ function renderCreditCards(){
         💳 ${escapeHtml(c.nome)}
       </div>
 
-      <div class="creditMeta">
-        vence dia ${String(c.vencimento||10).padStart(2,'0')}
-        • fecha dia ${String(c.fechamento||1).padStart(2,'0')}
+      <div class="creditMeta creditDates">
+        <span>${today>=s.closesOn?'Fechou em':'Fecha em'} ${prettyISO(s.closesOn)}</span>
+        <span>Vence em ${prettyISO(s.dueOn)}</span>
       </div>
     </div>
 
@@ -1021,18 +1068,10 @@ function renderCreditCards(){
     <div class="creditCompactRight">
 
       <div class="creditInvoice">
-        ${fmt(s.invoice)}
+        ${fmt(s.paid?s.invoice:s.remaining)}
       </div>
 
-      <div class="creditStatus ${s.paid?'paid':'open'}">
-        ${
-          s.paid
-            ? '● PAGA'
-            : s.invoice>0
-              ? '● ABERTA'
-              : '● SEM LANÇAMENTOS'
-        }
-      </div>
+      <div class="creditStatus ${s.status}">● ${statusLabels[s.status]}</div>
 
     </div>
 
@@ -1062,7 +1101,7 @@ function renderCreditCards(){
       </div>
 
       <div class="creditInfoBox">
-        <span>DISPONÍVEL</span>
+        <span>LIMITE LIVRE</span>
         <b class="${s.available<0?'red':'green'}">
           ${fmt(s.available)}
         </b>
@@ -1284,11 +1323,16 @@ function fabAction(i){
   if(opt.action){opt.action();return}
   document.querySelectorAll('.section.active .formCard').forEach(c=>{if(c.id!==opt.form)c.classList.remove('open')});
   const el=document.getElementById(opt.form);
-  if(el){el.classList.add('open');setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),50)}
+  if(el){
+    if(!el.classList.contains('open')) toggleFormCard(opt.form);
+    setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'center'}),50);
+  }
 }
 function toggleFormCard(id){
   const el=document.getElementById(id);
-  if(el) el.classList.toggle('open');
+  if(!el)return;
+  el.classList.toggle('open');
+  if(id==='formCompraCartao'&&el.classList.contains('open')&&!purchaseNome.value&&!purchaseValor.value) syncPurchaseInvoiceMonth(true);
 }
 
 function proportionalHeightDashboard(value,max){
@@ -1297,10 +1341,7 @@ function proportionalHeightDashboard(value,max){
 }
 
 function dateISOForMonthDay(month,day){
-  const [y,m]=String(month).split('-').map(Number);
-  const last=new Date(y,m,0).getDate();
-  const d=Math.min(Math.max(1,parseInt(day)||1),last);
-  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  return Finance.dateForMonthDay(month,day);
 }
 function prettyISO(iso){
   if(!iso) return '';
@@ -2044,4 +2085,7 @@ function renderSalaryReceipts(){
 
 }
 
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&activeSectionId()==='cartao'&&lastCreditViewDate!==Finance.localDate()) renderCreditCards();
+});
 debtInicio.value=nowMonth(); toggleDebtType(); render(); updateFab();
